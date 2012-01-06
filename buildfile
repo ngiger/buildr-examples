@@ -13,7 +13,6 @@ ENV['OSGi'] ||= "#{File.expand_path(Dir.pwd)}/dummyOSGi"
 # Specify Maven 2.0 remote repositories here, like this:
 repositories.remote << "http://www.ibiblio.org/maven2/"
 
-WithSources = false
 desc "The Buildr4osgi-bug project"
 
 define('container') do
@@ -23,7 +22,7 @@ define('container') do
   define("bar", :version => "1.0.0") do
     compile { FileUtils.makedirs _('target/root/resources') }
     package(:bundle)
-    package(:sources) if WithSources
+    package(:sources)
   end
  
   define("foo", :version => "1.0.0") do
@@ -39,17 +38,17 @@ define('container') do
     f.update_sites << {:url => "http://example.com/update", :name => "My update site"}
     f.discovery_sites = [{:url => "http://example.com/update2", :name => "My update site2"}, 
       {:url => "http://example.com/upup", :name => "My update site in case"}]
-    package(:sources) if WithSources
+    puts f.inspect
   end
   
+  category = Buildr4OSGi::Category.new
+  category.name = "category.id"
+  category.label = "Some Label"
+  category.description = "The category is described here"
+  category.features<< project('foo')
   site = package(:site) do
-    category = Buildr4OSGi::Category.new
-    category.name = "category.id"
-    category.label = "Some Label"
-    category.description = "The category is described here"
-    category.features<< foo
-    site.categories << category
-    site    
   end
-#  package(:p2_from_site) # creates an empty site.xml (70 bytes long)
+  site.categories << category
+  site    
+  package(:p2_from_site)
 end
