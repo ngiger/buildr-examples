@@ -51,5 +51,5 @@ define('container') do
     site.categories << category
     site    
   end
-  package(:p2_from_site) # creates an empty site.xml (70 bytes long)
+#  package(:p2_from_site) # creates an empty site.xml (70 bytes long)
 end
