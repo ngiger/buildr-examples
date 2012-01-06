@@ -40,7 +40,6 @@ define('container') do
     f.discovery_sites = [{:url => "http://example.com/update2", :name => "My update site2"}, 
       {:url => "http://example.com/upup", :name => "My update site in case"}]
     package(:sources) if WithSources
- #   package(:p2_from_site).with :site =>  project('bar')
   end
   
   site = package(:site) do
@@ -52,6 +51,5 @@ define('container') do
     site.categories << category
     site    
   end
-   package(:p2_from_site).with :site =>  project('bar')
- #  package(:p2_from_site) # creates an empty site.xml (70 bytes long)
+  package(:p2_from_site) # creates an empty site.xml (70 bytes long)
 end
