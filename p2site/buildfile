@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 # To test this file call "buildr package"
 require 'buildr4osgi'
 
@@ -10,11 +11,6 @@ desc "An example Buildr4osgi project which builds a dummy p2site"
 define('container') do
   project.group = "grp"
   project.version = '1.0.0'
-    @ant = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
-        javac_task = @ant.javac(:srcdir => "test", :destdir => "classes"){|ant|
-            ant.classpath(:refid => "common.class.path")
-            ant.classpath(:refid => "foo.class.path")
-        }
   
   define("bar", :version => "1.0.0") do
     compile { FileUtils.makedirs _('target/root/resources') }
@@ -76,4 +72,15 @@ define('container') do
   category.features<< project('foo2')
   package(:site).categories << category
   package(:p2_from_site)
+
+  check package(:p2_from_site), 'The p2site should contain a site.xml' do
+    File.should exist('target/p2repository/site.xml')
+  end
+  check package(:p2_from_site), 'The p2site should contain an artifacts.jar' do
+    File.should exist('target/p2repository/artifacts.jar')
+  end
+  check package(:p2_from_site), 'The p2site should contain a content.jar' do
+    File.should exist('target/p2repository/content.jar')
+  end
+  
 end
