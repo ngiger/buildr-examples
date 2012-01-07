@@ -1,0 +1,79 @@
+# To test this file call "buildr package"
+require 'buildr4osgi'
+
+Buildr::write "bar/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "bar2/src/main/java/Hello2.java", "public class Hello2 {}"
+Buildr::write "bar3/src/main/java/Hello3.java", "public class Hello3 {}"
+
+desc "An example Buildr4osgi project which builds a dummy p2site"
+
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+    @ant = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
+        javac_task = @ant.javac(:srcdir => "test", :destdir => "classes"){|ant|
+            ant.classpath(:refid => "common.class.path")
+            ant.classpath(:refid => "foo.class.path")
+        }
+  
+  define("bar", :version => "1.0.0") do
+    compile { FileUtils.makedirs _('target/root/resources') }
+    package(:bundle)
+    package(:sources)
+  end
+ 
+  define("foo", :version => "1.0.0") do
+    f = package(:feature)
+    f.plugins << project("container:bar")
+    f.label = "My first feature using a p2site"
+    f.provider = "Acme Inc"
+    f.description = "My first feature"
+    f.changesURL = "http://example.com/changes"
+    f.license = "The license is too long to explain"
+    f.licenseURL = "http://example.com/license"
+    f.branding_plugin = "com.musal.ui"
+    f.update_sites << {:url => "http://example.com/update", :name => "My dummy p2site site"}
+    f.discovery_sites = [{:url => "http://example.com/update2", :name => "My dummy p2site site2"}, 
+      {:url => "http://example.com/upup", :name => "My update site in case"}]
+  end
+  
+  define("bar2", :version => "1.0.0") do
+    compile { FileUtils.makedirs _('target/root/resources') }
+    package(:bundle)
+    package(:sources)
+  end
+ 
+  define("bar3", :version => "1.0.0") do
+# With buildr 1.4.6 java and without the next line I get the following error
+# Errno::ENOENT : No such file or directory - /opt/src/buildr4osgi-bug/p2site/bar3/target/root/resources
+    compile { FileUtils.makedirs _('target/root/resources') }
+    package(:bundle)
+    package(:sources)
+  end
+ 
+  define("foo2", :version => "1.0.0") do
+    f = package(:feature)
+    f.plugins << project("container:bar2")
+    f.plugins << project("container:bar3")
+    f.label = "My second feature for a p2site"
+    f.description = "My second feature"
+    f.provider = "Acme Inc"
+    f.description = "The best feature ever"
+    f.changesURL = "http://example.com/changes"
+    f.license = "The license is too long to explain"
+    f.licenseURL = "http://example.com/license"
+    f.branding_plugin = "com.musal.ui2"
+    f.update_sites << {:url => "http://example.com/update", :name => "My dummy p2site site"}
+    f.discovery_sites = [{:url => "http://example.com/update2", :name => "My dummy p2site site2"}, 
+      {:url => "http://example.com/upup", :name => "My update site in case"}]
+  end
+  
+  category = Buildr4OSGi::Category.new
+  category.name = "category.id"
+  category.label = "My label generated #{Time.now}"
+  category.description = "The category is described here"
+  category.features<< project('foo')
+  category.features<< project('foo2')
+  package(:site).categories << category
+  package(:p2_from_site)
+end

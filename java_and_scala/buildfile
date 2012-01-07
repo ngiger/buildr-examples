@@ -1,0 +1,18 @@
+require 'buildr4osgi'
+
+Buildr::write "demo/src/main/resources/readme.textile", IO.readlines('../readme.textile')
+
+desc "An example buildr project which creates a PDF file from an textile markup file"
+
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+  
+  define("demo", :version => "1.0.0") do
+    package(:zip)
+    check package(:zip), 'generated zip file should contain a readme.pdf' do
+      it.should contain('readme.pdf')
+    end
+  end
+ 
+end

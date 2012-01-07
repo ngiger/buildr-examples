@@ -1,0 +1,32 @@
+#encoding: utf-8
+# To test this file 
+# buildr clean package
+# When building you will see, the message "Grüezi" printed before the Clean task
+# gets executed, as the AntProject was executed upon declaration
+# If it had created a file, this would not be available later on for packaging
+# Therefore we created another AntProject with :declarative=> false 
+# which can be called at compile time
+#
+require 'buildr'
+Java.load # needed to load class path for apache logger
+require 'antwrap'
+
+Buildr::write "bar/src/main/java/Hello.java", "public class Hello {}"
+
+desc "An example buildr project using antwrap"
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+  
+  define("bar", :version => "1.0.0") do
+    @ant1 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> true})
+    @echo_task1 = @ant1.echo(:message => "Grüezi"){|ant| }
+    @ant2 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
+    @echo_task2 = @ant2.echo(:message => "Bonjour"){|ant| }
+    compile { # @echo_task1 cannot be called here as it is nil
+	      @echo_task2.execute
+	    }
+    package(:jar)
+  end
+ 
+end

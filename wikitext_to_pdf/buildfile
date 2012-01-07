@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+# To test this file you must have an eclipse and fop installed!
+# export OSGi=/path/to/eclipse
+# buildr osgi:clean:dependencies osgi:resolve:dependencies osgi:install:dependencies
+# buildr clean package
+
+require 'buildr4osgi'
+
+Buildr::write "demo/src/main/readme.textile", IO.readlines('../readme.textile')
+desc "An example buildr project which creates a PDF file from an textile markup file"
+
+repositories.remote << "http://repo2.maven.org/maven2"
+FOP      = 'org.apache.xmlgraphics:fop:jar:1.0' 
+# org.eclipse.mylyn.wikitext cannot be found in a Maven repository
+# WIKITEXT = 'org.eclipse.mylyn.wikitext'
+
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+  
+  define("demo", :version => "1.0.0") do
+    Java.load # needed to load class path for apache logger
+    @ant1 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
+    @echo_task = @ant1.echo(:message => "Bonjour"){|ant| }
+    pdf2generate = []
+    Dir.glob(_('**/*.textile')).each {
+      |x|
+        dest = "target/#{File.basename(x, '.textile')}.pdf"
+	pdf2generate << dest
+	package(:zip).include(_(dest))
+    }
+
+    file pdf2generate.join(',') do |t|
+      Buildr.ant('wikitext_to_xslfo') do |wikitext|
+	  wikitext.taskdef :name=>'wikitext_to_xslfo',
+	  :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
+	  :classpath=> Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.mylyn.wikitext.*core*jar").join(File::PATH_SEPARATOR) do
+	end
+	FileUtils.makedirs(path_to(:target))
+	wikitext.wikitext_to_xslfo :targetdir=>path_to(:target),
+		  :validate => 'false',
+		  :markupLanguage => 'Textile' do
+	  wikitext.fileset(:dir => _('.'), :includes => "**/*.textile")
+	end
+      end
+      Dir.glob(path_to(:target)+'/*.fo').each {
+	|f|
+	  dest = "#{f.sub('.fo','.pdf')}"
+	    raise "File #{f} must exist " if !File.exists?(f)
+	    cmd = "fop #{f} #{dest}"
+	    res= system(cmd)
+	  }
+    end
+         
+    check package(:zip), 'zip should contain a readme.pdf' do
+      it.should contain('readme.pdf')
+    end 
+    
+    check package(:zip), 'zip should not contain a readme.fo' do
+      it.should_not contain('readme.fo')
+    end 
+    
+    check package(:zip), 'zip should not contain a readme.textile' do
+      it.should_not contain('readme.textile')
+    end 
+    
+  end
+ 
+end

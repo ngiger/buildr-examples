@@ -1,0 +1,15 @@
+h1. Some examples on how to use buildr.apache.org
+
+I often struggled a while, till I got all the small details right for a certain problem. Therefore I started this project.
+
+It contains various subdirectories, which contain each a small, self contained buildfile which exercises a specific problem.
+
+* p2site
+** Create an eclipse p2site with 2 features (uses buildr4osgi)
+* wikitext_to_pdf
+** Transforms this readme.textile to a pdf
+** uses wikitext_to_xslfo
+** uses Antwrap
+** tests whether generated zip file really contains the desired PDF file
+* java_and_scala
+** handling a project which contains java and scala files and where java files depend on scala
