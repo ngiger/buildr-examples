@@ -4,9 +4,12 @@ I often struggled a while, till I got all the small details right for a certain 
 
 It contains various subdirectories, which contain each a small, self contained buildfile which exercises a specific problem.
 
+* antwrap
+** simple example of how to use antwrap. Shows effect of :declarative
 * p2site
 ** Create an eclipse p2site with 2 features (uses buildr4osgi)
 * wikitext_to_pdf
+** Needs fop and an installed eclipse
 ** Transforms this readme.textile to a pdf
 ** uses wikitext_to_xslfo
 ** uses Antwrap
