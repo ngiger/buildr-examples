@@ -1,18 +1,57 @@
+#!/usr/bin/env ruby
+# A small demo project to show the interaction between Java and Scala
+
 require 'buildr4osgi'
+require 'buildr/scala'
 
-Buildr::write "demo/src/main/resources/readme.textile", IO.readlines('../readme.textile')
+Buildr::write "mixed/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "mixed/src/main/scala/HelloScala.scala", %(
+object HelloWorld extends Application {
 
-desc "An example buildr project which creates a PDF file from an textile markup file"
+   Console.println("Hello, world!");
+}
+)
+Buildr::write "java/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "scala/src/main/scala/HelloScala.scala", %(
+object HelloWorld extends Application {
+
+   Console.println("Hello, world!");
+}
+)
+
+desc "An demo project which uses Java and Scala"
 
 define('container') do
   project.group = "grp"
   project.version = '1.0.0'
+  compile.options.target = '1.6' # Work with Java 6
+  compile.options.source = '1.6' # Work with Java 6
   
-  define("demo", :version => "1.0.0") do
-    package(:zip)
-    check package(:zip), 'generated zip file should contain a readme.pdf' do
-      it.should contain('readme.pdf')
-    end
+  define("java", :version => "1.0.0") do
+    package(:jar)
+    check package(:jar), 'jar should contain a Hello.class' do
+      it.should contain('Hello.class')
+    end 
   end
- 
+  
+  define("scala", :version => "1.0.0") do
+    compile.options.target = '1.5' # scala does not work with 1.6!
+    package(:jar)
+    check package(:jar), 'jar should contain a HelloWorld.class' do
+      it.should contain('HelloWorld.class')
+    end 
+  end
+  
+  define("mixed", :version => "1.0.0") do
+    compile.options.target = '1.5' # scala does not work with 1.6!
+    dependencies << projects(['java', 'scala'])
+    package(:jar)
+    check package(:jar), 'jar should contain a Hello.class' do
+      it.should contain('Hello.class')
+    end 
+    check package(:jar), 'jar should contain a HelloWorld.class' do
+      it.should contain('HelloWorld.class')
+    end 
+  end
+  
 end
