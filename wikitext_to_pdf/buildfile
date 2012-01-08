@@ -29,39 +29,43 @@ def checkPreconditions
   end
 end
 
-def genDoku
-  Java.load # needed to load class path for apache logger
-  pdf2generate = []
-  Dir.glob(_('**/*.textile')).each {
-    |x|
-      dest = "target/#{File.basename(x, '.textile')}.pdf"
-      pdf2generate << dest
-#      puts "89: Adding #{_(dest)} from #{x}"
-      package(:zip).include(_(dest))
-  }
+def pdfFromFo(dest, src)
+  raise "File #{src} must exist " if !File.exists?(src)
+  cmd = "fop #{src} #{dest}"
+  res= system(cmd)
+end
 
-  pdf2generate.each { |pdfToGen|
-    file pdfToGen do |t|
-      Buildr.ant('wikitext_to_xslfo') do |wikitext|
-	  wikitext.taskdef :name=>'wikitext_to_xslfo',
-	  :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
-	  :classpath=> Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.mylyn.wikitext.*core*jar").join(File::PATH_SEPARATOR) do
-	end
-	FileUtils.makedirs(path_to(:target))
-	wikitext.wikitext_to_xslfo :targetdir=>path_to(:target),
-		  :validate => 'false',
-		  :markupLanguage => 'Textile' do
-	  wikitext.fileset(:dir => _('.'), :includes => "**/*.textile")
-	end
-      end
-      Dir.glob(path_to(:target)+'/*.fo').each {
-	|f|
-	  dest = "#{f.sub('.fo','.pdf')}"
-	    raise "File #{f} must exist " if !File.exists?(f)
-	    cmd = "fop #{f} #{dest}"
-	    res= system(cmd)
-	  }
+def foFromTextile(dest, src)
+  raise "File #{src} must exist " if !File.exists?(src)
+  t = dest
+  Java.load # needed to load class path for apache logger
+  Buildr.ant('wikitext_to_xslfo') do |wikitext|
+      wikitext.taskdef :name=>'wikitext_to_xslfo',
+      :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
+      :classpath=> Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.mylyn.wikitext.*core*jar").join(File::PATH_SEPARATOR) do
     end
+    puts "And generateing #{dest} from #{src}"
+    FileUtils.makedirs(File.dirname(dest))
+    wikitext.wikitext_to_xslfo :targetdir=>File.dirname(dest),
+	      :validate => 'false',
+	      :markupLanguage => 'Textile' do
+      wikitext.fileset(:dir => File.dirname(src), :includes => File.basename(src))
+    end
+  end
+end
+
+def genDoku
+  Dir.glob(_('**/*.textile')).each {
+    |src|
+      dest = _("target/doc/#{File.basename(src, '.textile')}.pdf")
+      foFile = dest.sub('.pdf','.fo')
+      file foFile => src do 
+	foFromTextile(foFile, src)
+      end
+      file dest => foFile do
+	pdfFromFo(dest, foFile)
+      end
+      package(:zip).include(dest, :as => "doc/#{File.basename(dest)}")
   }
 end
 
@@ -76,7 +80,7 @@ define('container') do
     package(:zip)
 
     check package(:zip), 'zip should contain a readme.pdf' do
-      it.should contain('readme.pdf')
+      it.should contain('doc/readme.pdf')
     end 
     
     check package(:zip), 'zip should not contain a readme.fo' do
@@ -94,7 +98,7 @@ define('container') do
     compile
     package(:zip)
     check package(:zip), 'zip should contain a readme.pdf' do
-      it.should contain('readme.pdf')
+      it.should contain('doc/readme.pdf')
     end 
     
     check package(:zip), 'zip should not contain a readme.fo' do
