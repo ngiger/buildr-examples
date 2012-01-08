@@ -6,7 +6,11 @@
 
 require 'buildr4osgi'
 
-Buildr::write "demo/src/main/readme.textile", IO.readlines('../readme.textile')
+Buildr::write "demo/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "demo/readme.textile", IO.readlines('../readme.textile')
+Buildr::write "nested/demo2/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "nested/demo2/doc/readme.textile", IO.readlines('../readme.textile')
+Buildr::write "nested/demo2/doc/second.textile", IO.readlines('../readme.textile')
 desc "An example buildr project which creates a PDF file from an textile markup file"
 
 repositories.remote << "http://repo2.maven.org/maven2"
@@ -14,23 +18,30 @@ FOP      = 'org.apache.xmlgraphics:fop:jar:1.0'
 # org.eclipse.mylyn.wikitext cannot be found in a Maven repository
 # WIKITEXT = 'org.eclipse.mylyn.wikitext'
 
-define('container') do
-  project.group = "grp"
-  project.version = '1.0.0'
-  
-  define("demo", :version => "1.0.0") do
-    Java.load # needed to load class path for apache logger
-    @ant1 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
-    @echo_task = @ant1.echo(:message => "Bonjour"){|ant| }
-    pdf2generate = []
-    Dir.glob(_('**/*.textile')).each {
-      |x|
-        dest = "target/#{File.basename(x, '.textile')}.pdf"
-	pdf2generate << dest
-	package(:zip).include(_(dest))
-    }
+def checkPreconditions
+  if  Dir.glob("#{ENV['OSGi']}/plugins").size == 0
+    puts "Environment variable OSGi must point to a valid eclipse installation"
+    exit 1
+  end
+  if !system('which fop')
+    puts "fop must be installed"
+    exit 1
+  end
+end
 
-    file pdf2generate.join(',') do |t|
+def genDoku
+  Java.load # needed to load class path for apache logger
+  pdf2generate = []
+  Dir.glob(_('**/*.textile')).each {
+    |x|
+      dest = "target/#{File.basename(x, '.textile')}.pdf"
+      pdf2generate << dest
+#      puts "89: Adding #{_(dest)} from #{x}"
+      package(:zip).include(_(dest))
+  }
+
+  pdf2generate.each { |pdfToGen|
+    file pdfToGen do |t|
       Buildr.ant('wikitext_to_xslfo') do |wikitext|
 	  wikitext.taskdef :name=>'wikitext_to_xslfo',
 	  :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
@@ -51,7 +62,37 @@ define('container') do
 	    res= system(cmd)
 	  }
     end
-         
+  }
+end
+
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+  checkPreconditions
+  
+  define("demo", :version => "1.0.0") do
+    genDoku
+    compile
+    package(:zip)
+
+    check package(:zip), 'zip should contain a readme.pdf' do
+      it.should contain('readme.pdf')
+    end 
+    
+    check package(:zip), 'zip should not contain a readme.fo' do
+      it.should_not contain('readme.fo')
+    end 
+    
+    check package(:zip), 'zip should not contain a readme.textile' do
+      it.should_not contain('readme.textile')
+    end 
+    
+  end
+
+  define("demo2", :version => "2.0.0", :base_dir=>'nested/demo2') do
+    genDoku
+    compile
+    package(:zip)
     check package(:zip), 'zip should contain a readme.pdf' do
       it.should contain('readme.pdf')
     end 
