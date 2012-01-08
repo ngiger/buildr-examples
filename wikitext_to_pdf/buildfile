@@ -44,7 +44,6 @@ def foFromTextile(dest, src)
       :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
       :classpath=> Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.mylyn.wikitext.*core*jar").join(File::PATH_SEPARATOR) do
     end
-    puts "And generateing #{dest} from #{src}"
     FileUtils.makedirs(File.dirname(dest))
     wikitext.wikitext_to_xslfo :targetdir=>File.dirname(dest),
 	      :validate => 'false',
