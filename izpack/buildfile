@@ -1,0 +1,119 @@
+#!/usr/bin/env ruby
+# To test this file you must have an eclipse installed!
+# export OSGi=/path/to/eclipse
+# buildr clean package
+# Use izpack to create an installer for two Java projects
+
+
+require 'buildr4osgi'
+require 'antwrap'
+
+Buildr::write "demo/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "demo2/src/main/java/Hello2.java", "public class Hello2 {}"
+Buildr::write "rsc/installer.xml", %(<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<installation version="1.0">
+	<info>
+		<appname>demo app @{version}</appname>
+		<appversion>@{version}</appversion>
+		<authors>
+			<author name="www.demo_app.org" email="info@demo_app.org" />
+		</authors>
+		<url>http://www.demo_app.org</url>
+	</info>
+
+	<guiprefs width="700" height="520" resizable="yes" />
+
+	<locale>
+		<langpack iso3="eng" />
+	</locale>
+	<variables>
+		<variable name="appversion" value="@{version}"/>
+		<variable name="UserPathPanelVariable" value="$SYSTEM_user_home/demo_app_inst"/>
+		
+	</variables>
+	<native type="izpack" name="ShellLink.dll" />
+
+	<panels>
+		<panel classname="TargetPanel" />
+		<panel classname="PacksPanel" />
+		<panel classname="InstallPanel" />
+		<panel classname="FinishPanel" />
+	</panels>
+
+	<packs>
+		<pack name="Demo-App @{version}" required="yes">
+			<description>Our demo app @{version}. Using @{jars}</description>
+			<file src="demo/target/container-demo-1.0.0.jar" targetdir="$INSTALL_PATH" />
+		</pack>
+		<pack name="A demo option" required="no">
+			<description>An optional jar for our demo app</description>
+			<file src="demo2/target/container-demo2-2.0.0.jar" targetdir="$INSTALL_PATH" />
+		</pack>
+	</packs>
+
+</installation>)
+
+desc "An example buildr project which creates an IzPack installer for an Eclipse PDE project"
+
+repositories.remote << "http://repo2.maven.org/maven2"
+IZPACK = 'org.codehaus.izpack:izpack-standalone-compiler:jar:4.3.4'
+
+def checkPreconditions
+  if  Dir.glob("#{ENV['OSGi']}/plugins").size == 0
+    puts "Environment variable OSGi must point to a valid eclipse installation"
+    exit 1
+  end
+end
+
+THIS_VERSION = '0.1.1'
+
+def genIzPack(dest, instXml, jars)
+  raise "File #{instXml} must exist " if !File.exists?(instXml)
+  Java.load # needed to load class path for apache logger
+  package.enhance do
+      ENV['version'] = THIS_VERSION
+      FileUtils.makedirs(File.dirname(dest))
+      Buildr.ant('izpack') do |x|
+	x.property(:name => "version", :value => THIS_VERSION) 
+	x.property(:name => "jars",    :value => jars.join(',')) 
+	x.echo(:message => "Generating izpack aus #{instXml} #{File.exists?(instXml)} dest ist #{dest}. jars are ${jars}")
+	x.taskdef :name=>'izpack', 
+	  :classname=>'com.izforge.izpack.ant.IzPackTask', 
+	  :classpath=> artifact(IZPACK)
+	x.izpack :input=> instXml,
+		  :output => dest,
+		  :basedir =>Dir.pwd,
+		  :installerType=>'standard',
+		  :inheritAll=>"true",
+		  :compression => 'deflate',
+		  :compressionLevel => '9' do
+	end
+      end
+  end
+end
+
+define('container') do
+  project.group = "grp"
+  project.version = THIS_VERSION
+  checkPreconditions
+  
+  define("demo", :version => "1.0.0") do
+    package(:jar)    
+  end
+
+  define("demo2", :version => "2.0.0") do
+    package(:jar)
+  end
+
+  genIzPack('target/demo-app-installer', 'rsc/installer.xml', 
+            [project('demo').package(:jar),project('demo2').package(:jar)])
+
+  check file('target/demo-app-installer.jar'), 'should exist' do
+    it.should exist
+  end
+
+  check file('target/demo-app-installer.jar'), "should contain packs/pack-Demo-App #{THIS_VERSION}" do
+    it.should contain "packs/pack-Demo-App #{THIS_VERSION}"
+  end
+
+end
