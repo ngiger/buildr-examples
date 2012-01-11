@@ -17,7 +17,7 @@ It contains various subdirectories, which contain each a small, self contained b
 ** Needs fop and an installed eclipse
 ** Transforms this readme.textile to a pdf
 ** uses wikitext_to_xslfo
-** uses Antwrap
+** uses Buildr.ant
 ** tests whether generated zip file really contains the desired PDF file
 * java_and_scala
 ** handling a project which contains java and scala files and where java files depend on scala
