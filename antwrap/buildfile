@@ -1,11 +1,17 @@
+#!/usr/bin/env ruby
 #encoding: utf-8
+# 
 # To test this file 
 # buildr clean package
+#
 # When building you will see, the message "Grüezi" printed before the Clean task
 # gets executed, as the AntProject was executed upon declaration
 # If it had created a file, this would not be available later on for packaging
 # Therefore we created another AntProject with :declarative=> false 
 # which can be called at compile time
+#
+# Another example is enhancing packaging the jar file to echo a message using
+# a java property passed to Ant's echo task
 #
 require 'buildr'
 Java.load # needed to load class path for apache logger
@@ -20,13 +26,23 @@ define('container') do
   
   define("bar", :version => "1.0.0") do
     @ant1 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> true})
-    @echo_task1 = @ant1.echo(:message => "Grüezi"){|ant| }
+    @echo_task1 = @ant1.echo(:message => "Grüezi")
     @ant2 = Antwrap::AntProject.new({:name=>"FooProject", :declarative=> false})
-    @echo_task2 = @ant2.echo(:message => "Bonjour"){|ant| }
+    @echo_task2 = @ant2.echo(:message => "Bonjour")
+    Buildr.ant('buildr.ant') do |x|
+      x.echo(:message => "Buildr.ant is a wrapper around ant")
+    end
     compile { # @echo_task1 cannot be called here as it is nil
 	      @echo_task2.execute
 	    }
     package(:jar)
+    package(:jar).enhance do
+      Buildr.ant('buildr.ant') do |x|
+	x.property(:name => "propertyName", :value => "propertyValue") 
+	x.echo(:message => "Buildr.ant is a wrapper around ant")
+	x.echo(:message => "Buildr.ant using the value of a propertyName ${propertyName}")
+      end
+    end
   end
  
 end
