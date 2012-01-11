@@ -6,6 +6,11 @@ It contains various subdirectories, which contain each a small, self contained b
 
 * antwrap
 ** simple example of how to use antwrap. Shows effect of :declarative
+** example using Buildr.ant
+** shows how to define Java properties
+* izpack
+** Howto create an IzPack installer for two java projects
+** Uses Buildr.ant to wrap the izpack Ant task
 * p2site
 ** Create an eclipse p2site with 2 features (uses buildr4osgi)
 * wikitext_to_pdf
@@ -16,3 +21,10 @@ It contains various subdirectories, which contain each a small, self contained b
 ** tests whether generated zip file really contains the desired PDF file
 * java_and_scala
 ** handling a project which contains java and scala files and where java files depend on scala
+
+h2. Coming soon
+
+* pde_unittest
+** Running unit tests for Eclipse PDE project
+
+Comments, feedback are welcome and can be sent via E-Mail to niklaus.giger@member.fsf.org.
