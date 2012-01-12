@@ -20,11 +20,11 @@ It contains various subdirectories, which contain each a small, self contained b
 ** uses Buildr.ant
 ** tests whether generated zip file really contains the desired PDF file
 * java_and_scala
-** handling a project which contains java and scala files and where java files depend on scala
-
-h2. Coming soon
-
 * pde_unittest
 ** Running unit tests for Eclipse PDE project
+** handling a project which contains java and scala files and where java files depend on scala
+* pde_unittest
+** Running unit tests for Eclipse PDE project
+** Not elegant, but show the way (I hope)
 
 Comments, feedback are welcome and can be sent via E-Mail to niklaus.giger@member.fsf.org.
