@@ -1,19 +1,28 @@
 #!/usr/bin/env ruby
-# To test this file you must adapt the constant EclipseTarFile to your system!
-# It will be expanded into an eclipse subdir.
-# buildr clean package
+# To test this file you must:
+# * adapt the constant EclipseTarFile to your system! It will be expanded into an eclipse subdir.
+#
+# rvm jruby do buildr osgi:clean:dependencies osgi:resolve:dependencies osgi:install:dependencies
+# rvm jruby do buildr buildr clean package
+#
+# Tested January 2012, using
+# * buildr 1.4.6 java and 
+# * my patched version of buildr4osgi https://github.com/ngiger/buildr4osgi commit 0228da8fc9
+# * Debian wheezy 64-bit
+# * rvm 1.10.0
+# * jruby 1.6.5 (ruby-1.8.7-p330) (2011-10-25 9dcd388) (Java HotSpot(TM) 64-Bit Server VM 1.6.0_26) [linux-amd64-java]
+#
 # Run PDE test for an Eclipse plugin
 # See the eclipse Bug 140503 - How to automate the running of Eclipse PDE Unit tests using ant
 #     https://bugs.eclipse.org/bugs/show_bug.cgi?id=140503
 # Documentation https://bugs.eclipse.org/bugs/attachment.cgi?id=109388
 # Code comes from https://bugs.eclipse.org/bugs/attachment.cgi?id=143986
 # and https://bugs.eclipse.org/bugs/attachment.cgi?id=156982
-require 'buildr4osgi'
 
-desc "An example buildr project which runs a PDF unit test for an Eclipse PDE project"
+require 'buildr'
+
 EclipseTarFile = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
 EclipsePath    = File.expand_path(Dir.pwd+'/eclipse')
-repositories.remote << "http://repo2.maven.org/maven2"
 
 def addEclipse
   if  Dir.glob(EclipseTarFile).size == 0
@@ -24,6 +33,12 @@ def addEclipse
   puts "unpacking #{EclipseTarFile}"
   unzip(Dir.pwd => EclipseTarFile).extract
 end
+
+addEclipse if ARGV.join(' ').index('osgi:resolve')
+require 'buildr4osgi'
+
+desc "An example buildr project which runs a PDF unit test for an Eclipse PDE project"
+repositories.remote << "http://repo2.maven.org/maven2"
 
 def runPDE_UnitTest(classNames)
   test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
@@ -86,6 +101,11 @@ EOF
             :includes => "**/*.class,META-INF/MANIFEST.MF")
     end
 
+    # I know it take time (about 20" on my laptop) to remove and reinstall an RCP eclipse
+    # Running this test a second time, failed if the eclipse installation is not in a virgin state
+    # Send me an email if you know a faster workaround. Thanks!
+    FileUtils.rm_rf("#{EclipsePath}", :verbose => true)
+    addEclipse
     FileUtils.cp(pdeTestUtilsJar.to_s, "#{EclipsePath}/plugins", :verbose => true, :preserve => true)
     FileUtils.cp(testPluginJar, "#{EclipsePath}/plugins/", :verbose => true, :preserve => true)
     FileUtils.cp(zipName,  "#{EclipsePath}/plugins/", :verbose => true, :preserve => true)
@@ -137,7 +157,7 @@ define('container') do
   project.group = "grp"
   project.version = '1.0.0'
   clean.enhance     do FileUtils.rm_rf(EclipsePath, :verbose => false) end
-  resources.enhance do addEclipse end
+  resources.enhance do addEclipse if !File.directory?(EclipsePath) end
   
   define 'PhoneBookExample', :version => "1.0.0", :layout => layout do
     testPath = '../PhoneBookExample-test/test'
