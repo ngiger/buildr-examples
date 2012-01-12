@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
-# To test this file you must have an eclipse installed!
-# export OSGi=/path/to/eclipse
-# buildr osgi:clean:dependencies osgi:resolve:dependencies osgi:install:dependencies
+# To test this file you must adapt the constant EclipseTarFile to your system!
+# It will be expanded into an eclipse subdir.
 # buildr clean package
 # Run PDE test for an Eclipse plugin
 # See the eclipse Bug 140503 - How to automate the running of Eclipse PDE Unit tests using ant
@@ -11,105 +10,82 @@
 # and https://bugs.eclipse.org/bugs/attachment.cgi?id=156982
 require 'buildr4osgi'
 
-Buildr::write "demo/src/main/java/Hello.java", "public class Hello {}"
-Buildr::write "demo2/src/main/java/Hello.java", "public class Hello {}"
-
 desc "An example buildr project which runs a PDF unit test for an Eclipse PDE project"
-
+EclipseTarFile = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
+EclipsePath    = File.expand_path(Dir.pwd+'/eclipse')
 repositories.remote << "http://repo2.maven.org/maven2"
 
 def checkPreconditions
-  if  Dir.glob("#{ENV['OSGi']}/plugins").size == 0
-    puts "Environment variable OSGi must point to a valid eclipse installation"
+  if  Dir.glob(EclipseTarFile).size == 0
+    puts "#{EclipseTarFile} must point to an eclipse tar file for your system!"
     exit 1
   end
+  ENV['OSGi'] = EclipsePath
+  FileUtils.rm_rf(EclipsePath, :verbose => false)
+  puts "unpacking #{EclipseTarFile}"; sleep(0.01)
+  system("tar -xf #{EclipseTarFile}")
 end
-
 
 def runPDE_UnitTest(testPlugin = 'PhoneBookExample',
                     classNames = 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest')
   test.with project('pde.test.utils').package(:jar)
   test.with project(testPlugin).package(:plugin)
   test.with project('PhoneBookExample-test').package(:plugin)
-  tarFile = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
-  def cleanEclipseInstallation(testPlugin, eclipseDir)
-    puts "Deleting previously deployed plug-ins under #{eclipseDir}"
-    Dir.glob("#{eclipseDir}/configuration/*.log").each { |f| next if File.basename(f).eql?('config.ini'); FileUtils.rm_rf(f, :verbose => true) }
-    Dir.glob("#{eclipseDir}/plugins/*#{testPlugin}*.jar").each { |f| FileUtils.rm(f, :verbose => true) }
-    Dir.glob("#{eclipseDir}/plugins/*pde.test.utils*.jar").each { |f| FileUtils.rm(f, :verbose => true) }
-  end
   build.enhance do |tst|
     pathToPDETests = project('PhoneBookExample-test')
-    FileUtils.cp_r(pathToPDETests._('META-INF'), pathToPDETests._('target/'), :verbose => true)
+    FileUtils.cp_r(pathToPDETests._('META-INF'), pathToPDETests._('target/test/classes'), :verbose => true, :preserve => true)
     zipName = "PhoneBookExample-test_1.0.0.jar"
     Buildr.ant('create_eclipse_plugin') do |x|
       x.echo(:message => "Generating zip ")
       x.zip(:destfile => zipName,
-            :basedir  => pathToPDETests._('target/'))
+            :basedir  => pathToPDETests._('target/test/classes'),
+            :includes => "**/*.class,META-INF/MANIFEST.MF")
       x.echo(:message => "zip done")
     end
-    eclipseDir = Dir.pwd+'/eclipse'
     fullName = project(testPlugin).package(:plugin).to_s
     shortName = File.basename(fullName.sub('container-','')).sub('-','_')
-    puts "unpacking #{tarFile}"; sleep(0.01)
-    system("tar -xf #{tarFile}")
-    cleanEclipseInstallation(testPlugin, eclipseDir)
     testFull  = project('PhoneBookExample-test').package(:plugin).to_s
     testShort =  File.basename(testFull).sub('-test-','-test_')
-    FileUtils.cp(project('pde.test.utils').package(:jar).to_s, "#{eclipseDir}/plugins", :verbose => true)
-
-    # FileUtils.cp(zipName,  "#{eclipseDir}/plugins/", :verbose => true)
-    # using my gives  Bundle "PhoneBookExample" not found. Possible causes include missing dependencies, too restrictive version ranges, or a non-matching required execution environment.
-    FileUtils.cp("old/PhoneBookExample_1.0.0.jar", "#{eclipseDir}/plugins/", :verbose => true)
-    # FileUtils.cp(fullName, "#{eclipseDir}/plugins/#{shortName}", :verbose => true)
-
-    # FileUtils.cp(testFull, "#{eclipseDir}/plugins/#{testShort}", :verbose => true)
-    FileUtils.cp("old/PhoneBookExample-test_1.0.0.jar", "#{eclipseDir}/plugins/", :verbose => true)
+    FileUtils.cp(project('pde.test.utils').package(:jar).to_s, "#{EclipsePath}/plugins", :verbose => true, :preserve => true)
+    FileUtils.cp(fullName, "#{EclipsePath}/plugins/#{shortName}", :verbose => true, :preserve => true)
+    FileUtils.cp(zipName,  "#{EclipsePath}/plugins/", :verbose => true, :preserve => true)
     cmd  ="java -cp #{project('pde.test.utils').package(:jar)} pde.test.utils.PDETestPortLocator"
     system(cmd)
     myTestPort = IO.readlines('pde_test_port.properties').to_s.split('=')[1]
-    launcherPath =  Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar")
+    launcherPath =  Dir.glob("#{EclipsePath}/plugins/org.eclipse.equinox.launcher_*.jar")
   # create classpath test.eclipse.dir
-    listPath  = Dir.glob("#{eclipseDir}/plugins/org.eclipse.core.runtime_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.common_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.ui.workbench_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jface_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.swt_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.swt.gtk.linux.x86_64*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.junit_4*/**/junit.jar")
+    listPath  = Dir.glob("#{EclipsePath}/plugins/org.eclipse.core.runtime_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.equinox.common_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.ui.workbench_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.jface_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.swt_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.swt.gtk.linux.x86_64*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.junit_4*/**/junit.jar")
 
   # add classpath pde.test.listener.class.path
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.apache.ant_*/**/ant.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.apache.ant_*/**/ant-junit.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jdt.junit_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.debug.core_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.osgi_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jdt.junit.core_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.core.resources_*.jar")
-    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.preferences_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.apache.ant_*/**/ant.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.apache.ant_*/**/ant-junit.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.jdt.junit_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.debug.core_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.osgi_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.jdt.junit.core_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.core.resources_*.jar")
+    listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.equinox.preferences_*.jar")
     
     
-#    listPath += Dir.glob("#{eclipseDir}/plugins/")
+#    listPath += Dir.glob("#{EclipsePath}/plugins/")
     output = Dir.pwd+'/reports'
-    pdeTestUtilsJar = Dir.glob("#{eclipseDir}/plugins/*pde.test.utils*.jar")[0]
+    pdeTestUtilsJar = Dir.glob("#{EclipsePath}/plugins/*pde.test.utils*.jar")[0]
     cmd = "java -cp #{pdeTestUtilsJar}:#{listPath.join(':')} pde.test.utils.PDETestResultsCollector #{testPlugin} #{myTestPort} &"
     puts cmd
     res = system(cmd)
     puts "Started PDETestResultsCollector. Wait 1 second"; sleep(1)    
-phonebookexample = %(
-        <target name="run_pde_tests">
-       <property name="test.classes.list" value="phonebookexample.dialogs.PhoneBookEntryEditorDialogTest"/>
-       <mkdir dir="${test.reports.dir}/output/ws"/>
-       <java dir="${plugin.dir}" classname="org.eclipse.equinox.launcher.Main" fork="yes" classpathref="equinox.launcher.class.path">
-           <arg line="-application org.eclipse.pde.junit.runtime.uitestapplication -data ${test.reports.dir}/output/ws -dev bin -clean -port ${pde.test.port} -testpluginname PhoneBookExample -classnames ${test.classes.list}"/>
-       </java>
-)
     arg = "-application org.eclipse.pde.junit.runtime.uitestapplication " +
 			    "-data #{output} -dev bin -clean " +
 			    "-port #{myTestPort} -testpluginname PhoneBookExample " +
 			    "-classnames #{classNames}"
-      launcher = Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar")[0]
-      pdeTestClassPath = ["#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar",
+      launcher = Dir.glob("#{EclipsePath}/plugins/org.eclipse.equinox.launcher_*.jar")[0]
+      pdeTestClassPath = ["#{EclipsePath}/plugins/org.eclipse.equinox.launcher_*.jar",
                           project('pde.test.utils').package(:jar),
                           project('pde.test.utils').compile.dependencies.join(File::PATH_SEPARATOR),
                           project('PhoneBookExample').package(:jar),
@@ -117,23 +93,11 @@ phonebookexample = %(
                           test.dependencies.join(File::PATH_SEPARATOR),
                           self.package(:jar),
                           ].join(File::PATH_SEPARATOR)
-    cmd = "java -classpath #{launcher}:PhoneBookExample-test_1.0.0.jar org.eclipse.equinox.launcher.Main "
+    cmd = "java -classpath #{launcher} org.eclipse.equinox.launcher.Main "
     cmd += arg
     puts "Starting PDE test"
     puts cmd
     res = system(cmd)
-    system("grep -i error TEST-PhoneBookExample.xml")
-    Buildr.ant('generate_report') do |x|
-      x.echo(:message => "Generating HTML report ")
-      x.taskdef :name=>'junitreport', 
-	# :classname=>'com.izforge.izpack.ant.IzPackTask', 
-	:classpath=> artifact('xalan:xalan:jar:2.7.1')
-      x.junitreport(:todir => "./reports",
-            :include  => "TEST*.xml",
-            :report  => { :format => "frames", :todir => "./reports/html"}
-                   ) 
-    end
-    # cleanEclipseInstallation(testPlugin, eclipseDir)
   end
 end
       
@@ -150,7 +114,6 @@ define('container') do
   define 'pde.test.utils', :layout => layout  do
     compile.with(['org.apache.ant:ant:jar:1.8.2',
                   'org.apache.ant:ant-junit:jar:1.8.2',
-#                  'junit:junit:jar:4.4', 
                   'junit:junit:jar:3.8.2',
                   'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'])
     package(:jar)
@@ -163,13 +126,12 @@ define('container') do
     test.exclude '*' # Tell junit to ignore it
     package(:plugin).include _('plugin.xml')
     package.include _('icons/')
-    # test.with compile.dependencies
     check package(:plugin), 'plugin should contain icons/sample.gif' do
       it.should contain('icons/sample.gif')
-    end if false
+    end  if false
     check package(:plugin), 'plugin should contain plugin.xml' do
       it.should contain('plugin.xml')
-    end if false
+    end 
 
   end
   
@@ -177,24 +139,30 @@ define('container') do
     compile { FileUtils.makedirs(_('target/root/resources')) }
     compile.with project('PhoneBookExample').dependencies  # as PhoneBookExample-test is a fragment of PhoneBookExample
     test.exclude '*' # Tell junit to ignore it
-    # test.exclude 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest' # Tell junit to ignore it
     package(:plugin)
-    # package(:bundle)
     compile.with project('PhoneBookExample').package(:plugin)
-    # test.with compile.dependencies
   end
   runPDE_UnitTest
+  check file('PhoneBookExample-test_1.0.0.jar'), 'should exist' do
+    it.should exist
+  end
+  check file('PhoneBookExample-test_1.0.0.jar'), 'should contain a manifest' do
+    it.should contain('META-INF/MANIFEST.MF')
+  end
+  check file('PhoneBookExample-test_1.0.0.jar'), 'should contain a the test class' do
+    it.should contain('phonebookexample/dialogs/PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class')
+  end
   check file('TEST-PhoneBookExample.xml'), 'should exist' do
     it.should exist
   end
+  check file('TEST-PhoneBookExample.xml'), 'should match success' do
+    File.read('TEST-PhoneBookExample.xml').should match '<testsuite errors="0" failures="0"'
+  end
   check file('reports/TEST-PhoneBookExample.xml'), 'should exist' do
     it.should exist
-  end
-  check file('TEST-PhoneBookExample.xml'), 'should match success' do
-    it.should match(/<testsuite errors="0" failures="0"/)
-  end
+  end if false
   check file('reports/html/index.html'), 'should exist' do
     it.should exist
-  end
- 
+  end if false
+  
 end
