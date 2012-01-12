@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: PDE Test Utilities Plug-in
+Bundle-SymbolicName: pde.test.utils; singleton:=true
+Bundle-Version: 3.5.0
+Bundle-ActivationPolicy: lazy
+Export-Package: pde.test.utils
+Require-Bundle: org.eclipse.jdt.junit,
+ org.apache.ant,
+ org.junit
+Bundle-RequiredExecutionEnvironment: J2SE-1.5
+Bundle-Vendor: Brian Joyce / Elias Volanakis

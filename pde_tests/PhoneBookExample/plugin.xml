@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.actionSets">
+      <actionSet
+            label="Phone Book Example Action Set"
+            visible="true"
+            id="phonebookexample.actionSet">
+         <menu
+               id="phoneBookMenu"
+               label="&amp;Phone">
+            <separator
+                  name="phoneBookGroup">
+            </separator>
+         </menu>
+         <action
+               class="phonebookexample.actions.PhoneBookAction"
+               icon="icons/sample.gif"
+               id="phonebookexample.actions.PhoneBookAction"
+               label="&amp;Edit Phone Book"
+               menubarPath="phoneBookMenu/phoneBookGroup"
+               toolbarPath="phoneBookGroup"
+               tooltip="Edit Phone Book">
+         </action>
+      </actionSet>
+   </extension>
+
+</plugin>

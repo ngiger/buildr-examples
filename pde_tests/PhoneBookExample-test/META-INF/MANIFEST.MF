@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: PhoneBookExample_test Fragment
+Bundle-SymbolicName: PhoneBookExample_test
+Bundle-Version: 1.0.0
+Fragment-Host: PhoneBookExample;bundle-version="[1.0.0,2.0.0)"
+Bundle-Localization: plugin
+Require-Bundle: org.junit
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
