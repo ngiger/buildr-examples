@@ -1,0 +1,220 @@
+#!/usr/bin/env ruby
+# To test this file you must have an eclipse installed!
+# export OSGi=/path/to/eclipse
+# buildr osgi:clean:dependencies osgi:resolve:dependencies osgi:install:dependencies
+# buildr clean package
+# Run PDE test for an Eclipse plugin
+# See the eclipse Bug 140503 - How to automate the running of Eclipse PDE Unit tests using ant
+# Documentation https://bugs.eclipse.org/bugs/attachment.cgi?id=109388
+# Code comes from https://bugs.eclipse.org/bugs/attachment.cgi?id=143986
+# and https://bugs.eclipse.org/bugs/attachment.cgi?id=156982
+require 'buildr4osgi'
+
+Buildr::write "demo/src/main/java/Hello.java", "public class Hello {}"
+Buildr::write "demo2/src/main/java/Hello.java", "public class Hello {}"
+
+desc "An example buildr project which runs a PDF unit test for an Eclipse PDE project"
+
+repositories.remote << "http://repo2.maven.org/maven2"
+
+def checkPreconditions
+  if  Dir.glob("#{ENV['OSGi']}/plugins").size == 0
+    puts "Environment variable OSGi must point to a valid eclipse installation"
+    exit 1
+  end
+end
+
+
+def runPDE_UnitTest(testPlugin = 'PhoneBookExample',
+                    classNames = 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest')
+  test.with project('pde.test.utils').package(:jar)
+  test.with project(testPlugin).package(:plugin)
+  test.with project('PhoneBookExample-test').package(:plugin)
+  tarFile = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
+  def cleanEclipseInstallation(testPlugin, eclipseDir)
+    puts "Deleting previously deployed plug-ins under #{eclipseDir}"
+    Dir.glob("#{eclipseDir}/configuration/*.log").each { |f| next if File.basename(f).eql?('config.ini'); FileUtils.rm_rf(f, :verbose => true) }
+    Dir.glob("#{eclipseDir}/plugins/*#{testPlugin}*.jar").each { |f| FileUtils.rm(f, :verbose => true) }
+    Dir.glob("#{eclipseDir}/plugins/*pde.test.utils*.jar").each { |f| FileUtils.rm(f, :verbose => true) }
+  end
+  test.enhance do |tst|
+    eclipseDir = Dir.pwd+'/eclipse'
+    fullName = project(testPlugin).package(:plugin).to_s
+    shortName = File.basename(fullName.sub('container-',''))
+    puts shortName
+    system("tar -xf #{tarFile}")
+    puts "unpacking #{tarFile}"
+    cleanEclipseInstallation(testPlugin, eclipseDir)
+    FileUtils.cp(project('pde.test.utils').package(:jar).to_s, "#{eclipseDir}/plugins", :verbose => true)
+    FileUtils.cp(project('PhoneBookExample-test').package(:plugin).to_s, "#{eclipseDir}/plugins", :verbose => true)
+    FileUtils.cp(fullName, "#{eclipseDir}/plugins/#{shortName}", :verbose => true)
+    cmd  ="java -cp #{project('pde.test.utils').package(:jar)} pde.test.utils.PDETestPortLocator"
+    system(cmd)
+    myTestPort = IO.readlines('pde_test_port.properties').to_s.split('=')[1]
+    launcherPath =  Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar")
+  # create classpath test.eclipse.dir
+    listPath  = Dir.glob("#{eclipseDir}/plugins/org.eclipse.core.runtime_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.common_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.ui.workbench_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jface_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.swt_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.swt.gtk.linux.x86_64*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.junit_4*/**/junit.jar")
+
+  # add classpath pde.test.listener.class.path
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.apache.ant_*/**/ant.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.apache.ant_*/**/ant-junit.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jdt.junit_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.debug.core_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.osgi_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.jdt.junit.core_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.core.resources_*.jar")
+    listPath += Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.preferences_*.jar")
+    
+    
+#    listPath += Dir.glob("#{eclipseDir}/plugins/")
+    output = Dir.pwd+'/reports'
+    pdeTestUtilsJar = Dir.glob("#{eclipseDir}/plugins/*pde.test.utils*.jar")[0]
+    cmd = "java -cp #{pdeTestUtilsJar}:#{listPath.join(':')} pde.test.utils.PDETestResultsCollector #{testPlugin} #{myTestPort} &"
+    puts cmd
+    res = system(cmd)
+    puts res.inspect
+    puts "Started PDETestResultsCollector. Wait 5 seconds"; sleep(5)    
+phonebookexample = %(
+        <target name="run_pde_tests">
+       <property name="test.classes.list" value="phonebookexample.dialogs.PhoneBookEntryEditorDialogTest"/>
+       <mkdir dir="${test.reports.dir}/output/ws"/>
+       <java dir="${plugin.dir}" classname="org.eclipse.equinox.launcher.Main" fork="yes" classpathref="equinox.launcher.class.path">
+           <arg line="-application org.eclipse.pde.junit.runtime.uitestapplication -data ${test.reports.dir}/output/ws -dev bin -clean -port ${pde.test.port} -testpluginname PhoneBookExample -classnames ${test.classes.list}"/>
+       </java>
+)
+    arg = "-application org.eclipse.pde.junit.runtime.uitestapplication " +
+			    "-data #{output} -dev bin -clean " +
+			    "-port #{myTestPort} -testpluginname PhoneBookExample " +
+			    "-classnames #{classNames}"
+      launcher = Dir.glob("#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar")[0]
+      puts launcher
+      pdeTestClassPath = ["#{eclipseDir}/plugins/org.eclipse.equinox.launcher_*.jar",
+                          project('pde.test.utils').package(:jar),
+                          project('pde.test.utils').compile.dependencies.join(File::PATH_SEPARATOR),
+                          project('PhoneBookExample').package(:jar),
+                          compile.dependencies.join(File::PATH_SEPARATOR),
+                          test.dependencies.join(File::PATH_SEPARATOR),
+                          self.package(:jar),
+                          ].join(File::PATH_SEPARATOR)
+#    cmd = "java -classpath #{launcher}:#{pdeTestUtilsJar}:#{listPath.join(':')} org.eclipse.equinox.launcher.Main "
+    cmd = "java -classpath #{launcher}:#{fullName} org.eclipse.equinox.launcher.Main "
+    cmd += arg
+    puts 
+    puts cmd
+    puts "Starting PDE test"
+    res = system(cmd)
+    puts res
+    exit 0
+    cleanEclipseInstallation(testPlugin, eclipseDir)
+    if false
+#    FileUtils.rm("#{ENV['OSGi']/configuration/**")}
+
+      eclipsePlugin = Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.equinox.launcher_*.jar")
+      eclipsePlugin << project('pde.test.utils').package(:jar)
+#      eclipsePlugin << package(:jar)
+#      eclipsePlugin += Dir.glob(_('target/test/**/*.class'))
+      eclipsePlugin += Dir.glob("#{ENV['OSGi']}/plugins/*.jar")
+      pdeTestClassPath = ["#{ENV['OSGi']}/plugins/org.eclipse.equinox.launcher_*.jar",
+                          project('pde.test.utils').package(:jar),
+                          project('pde.test.utils').compile.dependencies.join(File::PATH_SEPARATOR),
+                          project('PhoneBookExample').package(:jar),
+                          compile.dependencies.join(File::PATH_SEPARATOR),
+                          test.dependencies.join(File::PATH_SEPARATOR),
+                          self.package(:jar),
+                          ].join(File::PATH_SEPARATOR)
+      args = "-Dosgi.requiredJavaVersion=1.5  -XX:MaxPermSize=256m -Xms40m -Xmx512m" +
+	' -Declipse.pde.launch=true -Declipse.p2.data.area=@config.dir/p2 -Dfile.encoding=UTF-8 ' +
+	" -classpath #{launcherPath} org.eclipse.equinox.launcher.Main " +
+	' -os linux -ws gtk -arch x86_64 -nl de_CH -consoleLog -version 3 ' +
+        " -port #{myTestPort}  -testLoaderClass org.eclipse.jdt.internal.junit4.runner.JUnit4TestLoader "+
+	" -loaderpluginname org.eclipse.jdt.junit4.runtime " +
+	" -application org.eclipse.pde.junit.runtime.uitestapplication"+
+	" -data #{Dir.pwd}/output/ws -dev bin  -clean " +
+#	" -cp #{eclipsePlugin.join(':')}  -port #{myTestPort} -testpluginname #{testPlugin} " +
+	" -cp #{pdeTestClassPath}  -port #{myTestPort} -testpluginname #{testPlugin} " +
+	" -classnames #{className} "
+      cmd = "java #{args}"
+      puts cmd
+      res  = system(cmd)
+      puts "res ist #{res}"
+    end
+  end
+  end
+      
+# wenn man -data/-configuartion oder -dev weglässt, werden die Klassen nicht richtig gefunden
+      
+      so_gings = %(
+/usr/lib/jvm/java-6-sun-1.6.0.26/bin/java -Dosgi.requiredJavaVersion=1.5 -XX:MaxPermSize=256m -Xms40m -Xmx512m
+
+-Dch.elexis.username=test -Dch.elexis.password=test 
+-Declipse.pde.launch=true -Declipse.p2.data.area=@config.dir/p2 -Dfile.encoding=UTF-8 
+-classpath /opt/indigo/eclipse/plugins/org.eclipse.equinox.launcher_1.2.0.v20110502.jar org.eclipse.equinox.launcher.Main
+-os linux -ws gtk -arch x86 -nl de_CH -consoleLog -version 3 
+-port 52786 -testLoaderClass org.eclipse.jdt.internal.junit4.runner.JUnit4TestLoader
+-loaderpluginname org.eclipse.jdt.junit4.runtime 
+-classNames ch.elexis.externe_dokumente.AllTests 
+-application org.eclipse.pde.junit.runtime.uitestapplication -product ch.elexis.ElexisProduct 
+-data /opt/elexis-2.1.dev/workspace/../junit-workspace 
+-configuration file:/opt/elexis-2.1.dev/workspace/.metadata/.plugins/org.eclipse.pde.core/pde-junit/ 
+-dev file:/opt/elexis-2.1.dev/workspace/.metadata/.plugins/org.eclipse.pde.core/pde-junit/dev.properties 
+-os linux -ws gtk -arch x86 -nl de_CH -consoleLog 
+-testpluginname ch.elexis.externe_dokumente
+)
+
+layout = Layout.new
+layout[:source, :main, :java] = 'src'
+layout[:source, :main, :resources] = 'rsc'
+layout[:source, :main, :scala] = 'src'
+layout[:source, :test, :java] = 'test'
+
+define('container') do
+  project.group = "grp"
+  project.version = '1.0.0'
+  checkPreconditions
+  
+  define 'pde.test.utils', :layout => layout  do
+    compile.with(['org.apache.ant:ant:jar:1.8.2',
+                  'org.apache.ant:ant-junit:jar:1.8.2',
+#                  'junit:junit:jar:4.4', 
+                  'junit:junit:jar:3.8.2',
+                  'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'])
+    package(:jar)
+  end
+  
+  define 'PhoneBookExample', :version => "1.0.0", :layout => layout do
+    compile { FileUtils.makedirs(_('target/root/resources')) }
+    test.exclude 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest' # Tell junit to ignore it
+    package(:plugin).include _('plugin.xml')
+    package.include _('icons/')
+    package(:plugin) # or buildr4osgi will not collect the dependencies
+    package(:bundle)
+    compile.with dependencies + project.dependencies
+    test.with compile.dependencies
+    package(:plugin)
+    check package(:plugin), 'plugin should contain icons/sample.gif' do
+      it.should contain('icons/sample.gif')
+    end 
+    check package(:plugin), 'plugin should contain plugin.xml' do
+      it.should contain('plugin.xml')
+    end 
+
+  end
+  
+  define 'PhoneBookExample-test', :layout => layout do
+    compile { FileUtils.makedirs(_('target/root/resources')) }
+    compile.with project('PhoneBookExample').dependencies  # as PhoneBookExample-test is a fragment of PhoneBookExample
+    test.exclude 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest' # Tell junit to ignore it
+    package(:plugin)
+    package(:bundle)
+    test.compile.with project('PhoneBookExample').package(:plugin)
+    test.with compile.dependencies
+  end
+  runPDE_UnitTest
+
+end
