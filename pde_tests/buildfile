@@ -15,13 +15,12 @@ EclipseTarFile = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
 EclipsePath    = File.expand_path(Dir.pwd+'/eclipse')
 repositories.remote << "http://repo2.maven.org/maven2"
 
-def checkPreconditions
+def addEclipse
   if  Dir.glob(EclipseTarFile).size == 0
     puts "#{EclipseTarFile} must point to an eclipse tar file for your system!"
     exit 1
   end
-  ENV['OSGi'] = EclipsePath
-  FileUtils.rm_rf(EclipsePath, :verbose => false)
+  ENV['OSGi'] = EclipsePath  
   puts "unpacking #{EclipseTarFile}"
   unzip(Dir.pwd => EclipseTarFile).extract
 end
@@ -32,7 +31,7 @@ def runPDE_UnitTest(classNames)
   shortName = name.to_s.sub(parent.to_s+':','')
   build.enhance do |tst|
     package(:plugin)
-    pdeTestUtilsJar = "#{path_to(:target, :test)}/pde.test.utils.jar"
+    pdeTestUtilsJar = "#{path_to(:target,:test)}/pde.test.utils.jar"
     FileUtils.makedirs(File.dirname(pdeTestUtilsJar))
     artifacts = []
     ['org.apache.ant:ant:jar:1.8.2',
@@ -51,7 +50,11 @@ def runPDE_UnitTest(classNames)
 	    :basedir  =>  File.dirname(pdeTestUtilsJar),
 	    :includes => "**/*.class")
     end if !File.exists?(pdeTestUtilsJar)
-    testMetaMf = "#{test.compile.target.to_s}/META-INF/MANIFEST.MF"
+    testClassesDir = path_to(:target,:test,:classes).to_s
+    testMetaMf = "#{testClassesDir}/META-INF/MANIFEST.MF"
+    puts testMetaMf.inspect
+    puts File.exists?(testMetaMf)	
+    if !File.exists?(testMetaMf)
   Buildr.write testMetaMf, <<EOF
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
@@ -63,9 +66,10 @@ Bundle-Localization: plugin
 Require-Bundle: org.junit
 Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 EOF
+    end
     testPluginJar = "#{compile.target.to_s}/#{shortName}_#{version}.jar"
     Buildr.ant('create_eclipse_plugin') do |x|
-      x.echo(:message => "Generating plugin #{shortName}")
+      x.echo(:message => "Generating plugin #{shortName} #{testPluginJar}")
       x.zip(:destfile => testPluginJar,
             :basedir  => compile.target.to_s,
             :includes => "**/*.class")
@@ -74,11 +78,11 @@ EOF
             :update   => true,
             :includes => "META-INF/MANIFEST.MF")
     end
-    zipName = "#{test.compile.target.to_s}/#{shortName}-test_#{version}.jar"
+    zipName = "#{testClassesDir}/#{shortName}-test_#{version}.jar"
     Buildr.ant('create_eclipse_plugin') do |x|
-      x.echo(:message => "Generating for test fragment for #{shortName}")
+      x.echo(:message => "Generating test fragment for #{shortName} #{zipName}")
       x.zip(:destfile => zipName,
-            :basedir  => test.compile.target.to_s,
+            :basedir  => File.dirname(zipName),
             :includes => "**/*.class,META-INF/MANIFEST.MF")
     end
 
@@ -108,7 +112,6 @@ EOF
     listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.core.resources_*.jar")
     listPath += Dir.glob("#{EclipsePath}/plugins/org.eclipse.equinox.preferences_*.jar")
     
-    
 #    listPath += Dir.glob("#{EclipsePath}/plugins/")
     output = Dir.pwd+'/reports'
     cmd = "java -cp #{pdeTestUtilsJar}:#{listPath.join(':')} pde.test.utils.PDETestResultsCollector #{shortName} #{myTestPort} &"
@@ -133,9 +136,19 @@ layout[:source, :test, :java] = 'test'
 define('container') do
   project.group = "grp"
   project.version = '1.0.0'
-  checkPreconditions
+  clean.enhance     do FileUtils.rm_rf(EclipsePath, :verbose => false) end
+  resources.enhance do addEclipse end
   
   define 'PhoneBookExample', :version => "1.0.0", :layout => layout do
+    testPath = '../PhoneBookExample-test/test'
+    if File.directory?(_(testPath))
+      puts "Patching Layout for PhoneBookExample-test"
+      layout[:source, :test, :java] = testPath
+      layout[:source, :test] = testPath
+      layout[:target, :test] = '../PhoneBookExample-test/target/test'
+    else
+      puts "Nothing to patch for #{_(testPath)}"
+    end
     compile { FileUtils.makedirs(_('target/root/resources')) }
     compile.with dependencies + project.dependencies
     package(:plugin).include _('plugin.xml')
@@ -149,13 +162,13 @@ define('container') do
     runPDE_UnitTest('phonebookexample.dialogs.PhoneBookEntryEditorDialogTest')
   end
 
-  check file('PhoneBookExample/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should exist' do
+  check file('PhoneBookExample-test/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should exist' do
     it.should exist
   end
-  check file('PhoneBookExample/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should contain a manifest' do
+  check file('PhoneBookExample-test/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should contain a manifest' do
     it.should contain('META-INF/MANIFEST.MF')
   end
-  check file('PhoneBookExample/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should contain a the test class' do
+  check file('PhoneBookExample-test/target/test/classes/PhoneBookExample-test_1.0.0.jar'), 'should contain the test class' do
     it.should contain('phonebookexample/dialogs/PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class')
   end
   check file('TEST-PhoneBookExample.xml'), 'should exist' do
