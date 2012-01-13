@@ -14,6 +14,7 @@
 # a java property passed to Ant's echo task
 #
 require 'buildr'
+remote.repositories << "http://repo2.maven.org/maven2"
 Java.load # needed to load class path for apache logger
 require 'antwrap'
 

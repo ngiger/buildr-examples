@@ -1,10 +1,19 @@
 #!/usr/bin/env ruby
 # To test this file call "buildr package"
 require 'buildr4osgi'
+repositories.remote << "http://repo2.maven.org/maven2"
+repositories.remote << "http://www.ibiblio.org/maven2"
+puts repositories.local.inspect
+# eclipseSDK = Buildr::artifact("org.eclipse:eclipse-SDK:zip:3.6M3-win32")
+# eclipseSDK.invoke
+# Buildr::unzip(File.dirname(eclipseSDK.to_s) => eclipseSDK.to_s).extract
 
 Buildr::write "bar/src/main/java/Hello.java", "public class Hello {}"
 Buildr::write "bar2/src/main/java/Hello2.java", "public class Hello2 {}"
 Buildr::write "bar3/src/main/java/Hello3.java", "public class Hello3 {}"
+
+puts repositories.remote.inspect
+puts repositories.local.inspect
 
 desc "An example Buildr4osgi project which builds a dummy p2site"
 

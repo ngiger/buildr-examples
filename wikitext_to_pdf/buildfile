@@ -9,11 +9,13 @@
 
 require 'buildr4osgi'
 
+foExample =  IO.readlines('../readme.textile')
 Buildr::write "demo/src/main/java/Hello.java", "public class Hello {}"
 Buildr::write "demo/readme.textile", IO.readlines('../readme.textile')
 Buildr::write "nested/demo2/src/main/java/Hello.java", "public class Hello {}"
-Buildr::write "nested/demo2/doc/readme.textile", IO.readlines('../readme.textile')
-Buildr::write "nested/demo2/doc/second.textile", IO.readlines('../readme.textile')
+Buildr::write "nested/demo2/doc/readme.textile", foExample
+Buildr::write "nested/demo2/doc/second.textile", foExample
+
 desc "An example buildr project which creates a PDF file from an textile markup file"
 
 repositories.remote << "http://repo2.maven.org/maven2"
@@ -26,7 +28,7 @@ def checkPreconditions
     puts "Environment variable OSGi must point to a valid eclipse installation"
     exit 1
   end
-  if !system('which fop')
+  if !system('fop -version') # an easy way to check whether fop works or not
     puts "fop must be installed"
     exit 1
   end
@@ -76,7 +78,7 @@ define('container') do
   project.group = "grp"
   project.version = '1.0.0'
   checkPreconditions
-  
+
   define 'docs' do
     package(:zip)
     check package(:zip), 'zip should contain a demo/readme.pdf' do

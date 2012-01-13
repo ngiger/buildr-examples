@@ -21,21 +21,30 @@
 
 require 'buildr'
 
-EclipseTarFile   = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
-EclipsePath      = File.expand_path('eclipse')
-EclipsePathArray = File.split(File.expand_path('eclipse'))
+myDefault = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
+EclipseTarFile = ENV['EclipseTarFile'] ?  myDefault : myDefault
+
+EclipsePath = File.expand_path('eclipse')
+ENV['OSGi'] = EclipsePath
+
+ANT_ARTIFACTS = [
+  'org.apache.ant:ant:jar:1.8.2',
+  'org.apache.ant:ant-junit:jar:1.8.2',
+  'junit:junit:jar:3.8.2',
+  'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'
+]
 
 def addEclipse
   if  Dir.glob(EclipseTarFile).size == 0
     puts "#{EclipseTarFile} must point to an eclipse tar file for your system!"
     exit 1
   end
-  ENV['OSGi'] = EclipsePath
   return if defined?(@@firstRun) and File.directory?(EclipsePath)
   puts "unpacking #{EclipseTarFile}"
   unzip(Dir.pwd => EclipseTarFile).extract
   @@firstRun = true
 end
+
 
 addEclipse if ARGV.join(' ').index('osgi:resolve') and !File.directory?(EclipsePath)
 require 'buildr4osgi'
@@ -45,20 +54,18 @@ repositories.remote << "http://repo2.maven.org/maven2"
 
 def runPDE_UnitTest(classNames)
   pluginPath = [ EclipsePath, 'plugins'].join(File::SEPARATOR)
-  launcherPath =  Dir.glob((EclipsePathArray+[ 'plugins', 'org.eclipse.equinox.launcher_*.jar']).join(File::SEPARATOR)).inspect
   test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
   test.with compile.target
+  test.compile.with ANT_ARTIFACTS
   shortName = name.to_s.sub(parent.to_s+':','')
   test.enhance do |tst|
     package(:plugin)
-    pdeTestUtilsDir = [path_to(:target,:test),'pde.test.utils'].join(File::SEPARATOR)
+    pdeTestUtilsDir = [path_to(:target,:test),''].join(File::SEPARATOR)
     pdeTestUtilsJar = [pdeTestUtilsDir,'pde.test.utils.jar'].join(File::SEPARATOR)
     FileUtils.makedirs(pdeTestUtilsDir)
     artifacts = []
-    ['org.apache.ant:ant:jar:1.8.2',
-		    'org.apache.ant:ant-junit:jar:1.8.2',
-		    'junit:junit:jar:3.8.2',
-		    'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'].each { |x| artifacts << artifact(x) }  
+    ANT_ARTIFACTS.each { |x| artifacts << artifact(x) }
+                         
     Buildr.ant('create_eclipse_plugin') do |x|
       x.echo(:message => "Generating pdeTestUtilsJar #{pdeTestUtilsJar}")
       x.javac(:srcdir => "pde.test.utils/src",
@@ -66,7 +73,7 @@ def runPDE_UnitTest(classNames)
 	      :includeantruntime => false,
 	      :destdir => pdeTestUtilsDir
 	    )
-	      
+
       x.zip(:destfile => pdeTestUtilsJar,
 	    :basedir  => pdeTestUtilsDir,
 	    :includes => '**/*.class')
@@ -117,42 +124,50 @@ EOF
     FileUtils.cp(pdeTestUtilsJar, pluginPath, :verbose => true, :preserve => true)
     FileUtils.cp(testPluginJar, pluginPath, :verbose => true, :preserve => true)
     FileUtils.cp(zipName,  pluginPath, :verbose => true, :preserve => true)
-    cmd  ="java -cp #{pdeTestUtilsJar} pde.test.utils.PDETestPortLocator"
-    system(cmd)
+    Java::Commands.java('pde.test.utils.PDETestPortLocator', {:classpath => pdeTestUtilsJar} )
     raise "Could not generate pde_test_port.properties" if !File.exists?('pde_test_port.properties')
     myTestPort = IO.readlines('pde_test_port.properties').to_s.split('=')[1]
-    launcherPath =  Dir.glob([pluginPath,'org.eclipse.equinox.launcher_*.jar'].join(File::SEPARATOR))
+    launcherPath =  Dir.glob([pluginPath,'org.eclipse.equinox.launcher_*.jar'].join(File::SEPARATOR))[0]
   # create classpath test.eclipse.dir
     
-    listPath  = Dir.glob([pluginPath, 'org.eclipse.core.runtime_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.equinox.common_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.ui.workbench_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.jface_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.swt_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.swt.gtk.linux.x86_64*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.junit_4*/**/junit.jar'].join(File::SEPARATOR))
+    listPath = []
+    listPath << pdeTestUtilsJar
+    listPath << Dir.glob([pluginPath, 'org.eclipse.core.runtime_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.equinox.common_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.ui.workbench_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.jface_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.swt_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.swt.gtk.linux.x86_64*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.junit_4*/**/junit.jar'].join(File::SEPARATOR))
 
   # add classpath pde.test.listener.class.path
-    listPath += Dir.glob([pluginPath, 'org.apache.ant_*/**/ant.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.apache.ant_*/**/ant-junit.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.jdt.junit_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.debug.core_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.osgi_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.jdt.junit.core_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.core.resources_*.jar'].join(File::SEPARATOR))
-    listPath += Dir.glob([pluginPath, 'org.eclipse.equinox.preferences_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.apache.ant_*/**/ant.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.apache.ant_*/**/ant-junit.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.jdt.junit_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.debug.core_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.osgi_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.jdt.junit.core_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.core.resources_*.jar'].join(File::SEPARATOR))
+    listPath << Dir.glob([pluginPath, 'org.eclipse.equinox.preferences_*.jar'].join(File::SEPARATOR))
     output =[ Dir.pwd, 'reports'].join(File::SEPARATOR)
-    cmd = "java -cp #{pdeTestUtilsJar}:#{listPath.join(':')} pde.test.utils.PDETestResultsCollector #{shortName} #{myTestPort} &"
-    res = system(cmd)
+    Thread.new do
+      puts "Starting PDETestResultsCollector"
+      Java::Commands.java('pde.test.utils.PDETestResultsCollector', shortName, myTestPort, {:classpath => listPath} )
+      puts "PDETestResultsCollector finished"
+    end
+    
     puts "Started PDETestResultsCollector. Wait 1 second"; sleep(1)    
-    arg = "-application org.eclipse.pde.junit.runtime.uitestapplication " +
-			    "-data #{output} -dev bin -clean " +
-			    "-port #{myTestPort} -testpluginname #{shortName} " +
-			    "-classnames #{classNames}"
-    cmd = "java -classpath #{[pluginPath,'org.eclipse.equinox.launcher_*.jar'].join(File::SEPARATOR)} org.eclipse.equinox.launcher.Main "
-    cmd += arg
     puts "Starting PDE test"
-    res = system(cmd)
+    Java::Commands.java('org.eclipse.equinox.launcher.Main', 
+			'-application',    'org.eclipse.pde.junit.runtime.uitestapplication',
+			'-data',           output,
+			'-dev',            'bin',
+			'-clean',
+			'-port',           myTestPort,
+			'-testpluginname', shortName,
+			'-classnames',     classNames,
+			{:classpath => launcherPath } 
+			)
   end
 end
       

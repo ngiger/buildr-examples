@@ -13,6 +13,7 @@ It contains various subdirectories, which contain each a small, self contained b
 ** Uses Buildr.ant to wrap the izpack Ant task
 * p2site
 ** Create an eclipse p2site with 2 features (uses buildr4osgi)
+** assumes a eclipse artifact somewhere in the path
 * wikitext_to_pdf
 ** Needs fop and an installed eclipse
 ** Transforms this readme.textile to a pdf
@@ -26,5 +27,9 @@ It contains various subdirectories, which contain each a small, self contained b
 * pde_unittest
 ** Running unit tests for Eclipse PDE project
 ** Not elegant, but show the way (I hope)
+
+I developed and tested the examples on my Debian wheezy (x86_64) system.
+Running the tests under windows showed several problems (e.g. wikitext_to_xslfo does
+not handle the example).
 
 Comments, feedback are welcome and can be sent via E-Mail to niklaus.giger@member.fsf.org.
