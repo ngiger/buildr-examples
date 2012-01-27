@@ -3,7 +3,7 @@
 # * adapt the constant EclipseTarFile to your system! It will be expanded into an eclipse subdir.
 #
 # rvm jruby do buildr osgi:clean:dependencies osgi:resolve:dependencies osgi:install:dependencies
-# rvm jruby do buildr buildr clean package
+# rvm jruby do buildr buildr integration
 #
 # Tested January 2012, using
 # * buildr 1.4.6 java and 
@@ -202,7 +202,7 @@ define('container') do
   define 'PhoneBookExample', :version => "1.0.0", :layout => layout do
     testPath = ['..', 'PhoneBookExample-test','test'].join(File::SEPARATOR)
     if File.directory?(_(testPath))
-      puts "Patching Layout for PhoneBookExample-test"
+      puts "Patching Layout for PhoneBookExample-test #{testPath}"
       layout[:source, :test, :java] = testPath
       layout[:source, :test] = testPath
       layout[:target, :test] = ['..', 'PhoneBookExample-test', 'target', 'test'].join(File::SEPARATOR)
