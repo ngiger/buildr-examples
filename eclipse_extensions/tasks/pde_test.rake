@@ -13,9 +13,9 @@ module PDE_test
     if project.parent == nil
       puts "Add PDE_test integration stuff for root project"
       PDE_test::stuffForRootProject 
-      project.integration.teardown(:createPDEtestHtml) 
-      project.integration.prerequisites << @@pdeTestUtilsJar
     else
+      # patch directory layout for tests. But leave the use the choice
+      # whether he wants to run traditional JUnit tests or our PDE_tests
       short = project.name.sub(project.parent.name+':','')
       dirs = Dir.glob(File.join(project._, '..', short+'-test')) 
       if dirs.size == 1
@@ -29,28 +29,6 @@ module PDE_test
 	else
 	  puts "Patching #{short}: #{testBase}"
 	end
-      end
-      # Define the loc task for this particular project.
-      tstPath = project.path_to(:source, :test, :java)
-      found = Dir.glob(File.join(tstPath, '**', 'AllTests.java'))
-      project.PDETestClassName = nil
-      if found.size > 0
-	# Set java classname 
-	project.PDETestClassName = found[0].sub(tstPath,'').gsub(File::SEPARATOR,'.').sub('.src.','').sub(/^\./,'').sub(/\.java$/,'')
-	puts "#{project.id} has PDE_test #{project.PDETestClassName}"
-      end
-    end
-  end
-
-  after_define do |project|
-    if project.PDETestClassName
-      project.compile.dependencies << ENV['OSGi']
-      project.test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
-      project.test.compile.with project.dependencies + project.compile.dependencies
-      project.test.with project.compile.target if project.compile.target
-      project.test.compile.with ANT_ARTIFACTS
-      project.integration do
-	PDE_test::run_pde_test(project, project.PDETestClassName)
       end
     end
   end
@@ -152,8 +130,26 @@ EOF
   end
 
 public
-  def PDE_test::run_pde_test(project, classnames = nil)
+  # you must call run_pde_test from your project. I have no clue
+  # where you want junit or pde-tests
+  # opts are optional paramaters to be passed to the PDE test
+  def PDE_test::run_pde_test(project, classnames = nil, opts = nil)
+    project.test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
+    # Define the loc task for this particular project.
+    tstPath = project.path_to(:source, :test, :java)
+    found = Dir.glob(File.join(tstPath, '**', 'AllTests.java'))
+    project.PDETestClassName = nil
+    if found.size > 0
+      # Set java classname 
+      project.PDETestClassName = found[0].sub(tstPath,'').gsub(File::SEPARATOR,'.').sub('.src.','').sub(/^\./,'').sub(/\.java$/,'')
+      puts "#{project.id} has PDE_test #{project.PDETestClassName}"
+    end
     project.PDETestClassName = classnames if classnames
+    project.integration.teardown(:createPDEtestHtml) 
+    project.integration.prerequisites << @@pdeTestUtilsJar
+    project.test.compile.with project.dependencies + project.compile.dependencies
+    project.test.with project.compile.target if project.compile.target
+    project.test.compile.with ANT_ARTIFACTS
     shortName = project.name.to_s.sub(project.parent.to_s+':','')
     testFragmentJar = PDE_test::addTestJar(shortName, project)
     project.test.using :integration
@@ -200,9 +196,7 @@ public
 			  '-port',           myTestPort,
 			  '-testpluginname', shortName,
 			  '-classnames',     project.PDETestClassName,
-			  '-Dch.elexis.username', '007',
-			  '-Dch.elexis.password', 'topsecret',
-			  '-Delexis-run-mode', 'RunFromScratch',
+			  opts,
 			  {:classpath =>     Dir.glob(File.join(@@pluginPath,'org.eclipse.equinox.launcher_*.jar'))} 
 			  )
       raise "#{project.PDETestResultXML} should exist" if !File.exists?(project.PDETestResultXML)

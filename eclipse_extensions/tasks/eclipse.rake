@@ -40,11 +40,12 @@ module EclipseExtension
   Layout.default[:source, :test, :scala]     = 'test'
 
   before_define do |project|
+    if !ENV['OSGi'] 
+	puts "OSGi musts point to an installed eclipse"
+	exit(3)
+    end
+    project.compile.dependencies << ENV['OSGi']
     if project.parent
-      if !ENV['OSGi'] 
-	  puts "OSGi musts point to an installed eclipse"
-	  exit(3)
-      end
       project.compile.with project.dependencies
       addDependencies(project) if project.dependencies
       project.package(:plugin) if  Dir.glob(File.join(project._,'plugin.xml')) 

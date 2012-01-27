@@ -28,7 +28,8 @@ define('myProject') do
   end
 
   define 'PhoneBookExample'  do
-    PDE_test::run_pde_test(project, 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest')
+    PDE_test::run_pde_test(project, 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest', 
+                           [ '-DmyOpt', 'aValue', '-moreopt'])
   end
   
   check file(File.join('PhoneBookExample','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should exist' do
