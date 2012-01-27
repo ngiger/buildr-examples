@@ -12,230 +12,42 @@
 # * rvm 1.10.0
 # * jruby 1.6.5 (ruby-1.8.7-p330) (2011-10-25 9dcd388) (Java HotSpot(TM) 64-Bit Server VM 1.6.0_26) [linux-amd64-java]
 #
-# Run PDE test for an Eclipse plugin
-# See the eclipse Bug 140503 - How to automate the running of Eclipse PDE Unit tests using ant
-#     https://bugs.eclipse.org/bugs/show_bug.cgi?id=140503
-# Documentation https://bugs.eclipse.org/bugs/attachment.cgi?id=109388
-# Code comes from https://bugs.eclipse.org/bugs/attachment.cgi?id=143986
-# and https://bugs.eclipse.org/bugs/attachment.cgi?id=156982
+# For details running PDE test for an Eclipse plugin see ../pde_tests/buildfile
+# the com..example.hellorcp was created using http://www.ralfebert.de/eclipse_rcp/overview/
 
 require 'buildr'
-
-myDefault = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
-EclipseTarFile = ENV['EclipseTarFile'] ?  ENV['EclipseTarFile'] : myDefault
-
-EclipsePath = File.expand_path('eclipse')
-ENV['OSGi'] = EclipsePath
-
-def addEclipse
-  if  Dir.glob(EclipseTarFile).size == 0
-    puts "#{EclipseTarFile} must point to an eclipse tar file for your system!"
-    exit 1
-  end
-  return if defined?(@@firstRun) and File.directory?(EclipsePath)
-  puts "unpacking #{EclipseTarFile}"
-  unzip(Dir.pwd => EclipseTarFile).extract
-  @@firstRun = true
-end
-
-addEclipse if ARGV.join(' ').index('osgi:resolve') and !File.directory?(EclipsePath)
 require 'buildr4osgi'
 repositories.remote << "http://repo2.maven.org/maven2"
 
-task :createPDEtestHtml do
-  Buildr.ant('create_html') do |ant|      
-    FileUtils.makedirs('reports')
-    ant.echo(:message => "Generating html report for all PDE tests")
-    ant.taskdef :name=>'junitreport', :classname=>'org.apache.tools.ant.taskdefs.optional.junit.XMLResultAggregator',
-	    :classpath=>Buildr.artifacts(JUnit.ant_taskdef).each(&:invoke).map(&:to_s).join(File::PATH_SEPARATOR)
-    ant.junitreport(:todir => 'reports') do
-	ant.fileset(:dir=>Dir.pwd) { ant.include :name=>'TEST-*.xml' }
-	ant.report(:format => 'frames',  :todir => File.join('reports', 'PDE_test'))
-    end
-  end
-end
-
-ANT_ARTIFACTS = [
-  'ant:ant-optional:jar:1.5.3-1',
-  'org.apache.ant:ant:jar:1.8.2',
-  'org.apache.ant:ant-junit:jar:1.8.2',
-  'junit:junit:jar:3.8.2',
-  'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'
-]
-
-# return all needed Eclipse plug-ins for the pdeTestLocator
-def getPdeTestClasspath(addJar=nil)
-  pluginPath  = File.join(EclipsePath, 'plugins')
-  pdeTestPath = []
-  pdeTestPath << addJar if addJar
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.core.runtime_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.equinox.common_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.ui.workbench_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.jface_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.swt_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, "org.eclipse.swt.gtk.linux*.jar"))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.junit_4*','**','junit.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.apache.ant_*','**','ant.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.apache.ant_*','**','ant-junit.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.jdt.junit_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.debug.core_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.osgi_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.jdt.junit.core_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.core.resources_*.jar'))
-  pdeTestPath << Dir.glob(File.join(pluginPath, 'org.eclipse.equinox.preferences_*.jar'))
-end
-
-def runPDE_UnitTest(classNames)
-  shortName = name.to_s.sub(parent.to_s+':','')
-  file EclipsePath => EclipseTarFile do
-    addEclipse
-  end
-  pluginPath      = File.join(EclipsePath, 'plugins')
-  pdeTestSources  = Dir.glob(File.join('pde.test.utils', '**','*.java'))
-  pdeTestUtilsJar = File.join(path_to(:target,:test),'pde.test.utils','pde.test.utils.jar')
-  compile.dependencies << EclipsePath
-  test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
-  test.with compile.target
-  test.compile.with ANT_ARTIFACTS
-  test.using :integration
-  integration.setup(package(:plugin))
-   
-  # we need a jar with the compiled pde.test.util java files
-  integration.setup(pdeTestUtilsJar)
-
-  file pdeTestUtilsJar => pdeTestSources do
-    Buildr.ant('create_eclipse_plugin') do |x|
-      FileUtils.makedirs( File.dirname(pdeTestUtilsJar))
-      x.javac(:srcdir => File.join('pde.test.utils','src'),
-             :classpath => getPdeTestClasspath.join(File::PATH_SEPARATOR),
-             :includeantruntime => false,
-             :destdir =>  File.dirname(pdeTestUtilsJar)
-           )
-      x.echo(:message => "Create #{pdeTestUtilsJar}")
-      x.zip(:destfile => pdeTestUtilsJar,
-	    :basedir  => File.dirname(pdeTestUtilsJar),
-	    :includes => '**/*.class')
-    end
-  end
-  
-  # we need a test fragment for the test
-  testClassesDir = path_to(:target,:test,:classes)
-  testMetaMf = [testClassesDir,'META-INF','MANIFEST.MF'].join(File::SEPARATOR) 
-  file testMetaMf do
-    Buildr.write testMetaMf, <<EOF
-Manifest-Version: 1.0
-Bundle-ManifestVersion: 2
-Bundle-Name: #{shortName}_test Fragment
-Bundle-SymbolicName: #{shortName}_test
-Bundle-Version: #{version}
-Fragment-Host: #{shortName};bundle-version="#{version}"
-Bundle-Localization: plugin
-Require-Bundle: org.junit
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
-EOF
-  end
-
-  # we need a jar file with test-fragment classes & manifest
-  testFragmentJar = [testClassesDir,"#{shortName}-test_#{version}.jar"].join(File::SEPARATOR)
-  integration.setup(testFragmentJar)
-  file testFragmentJar => [testMetaMf, test.compile] do
-    Buildr.ant('create_eclipse_plugin') do |x|
-      x.echo(:message => "Generating test fragment for #{shortName} #{testFragmentJar}")
-      x.zip(:destfile => testFragmentJar,
-	    :basedir  => testClassesDir,
-	    :includes => '**/*.class,META-INF/MANIFEST.MF')
-    end
-  end
-  xmlName = "TEST-#{shortName}.xml"
-  integration.setup(test.compile)
-  
-  # Run the PDE test during integration
-  pdeJars = [pdeTestUtilsJar, testFragmentJar, package(:plugin).to_s]
-  integration.enhance do
-    pdeJars.each { 
-      |jar|
-	# dest = File.join(pluginPath, File.basename(jar).sub(parent.name+'-',''))
-	FileUtils.cp(jar, pluginPath, :verbose => true)
-    } 
-    Java::Commands.java('pde.test.utils.PDETestPortLocator', {:classpath => getPdeTestClasspath(pdeTestUtilsJar) } )
-    testPortFileName = 'pde_test_port.properties'
-    myTestPort = IO.readlines(testPortFileName).to_s.split('=')[1]
-    output =[ Dir.pwd, 'reports'].join(File::SEPARATOR)
-    Thread.new do
-      puts "Starting PDETestResultsCollector"
-      res = Java::Commands.java('pde.test.utils.PDETestResultsCollector', shortName, myTestPort, 
-				{:classpath => getPdeTestClasspath(pdeTestUtilsJar)} )
-      puts "PDETestResultsCollector finished"
-    end
-    puts "Started PDETestResultsCollector. Wait 1 second"; sleep(1)    
-    puts "Starting PDE test"
-    Java::Commands.java('org.eclipse.equinox.launcher.Main', 
-			'-application',    'org.eclipse.pde.junit.runtime.uitestapplication',
-			'-data',           output,
-			'-dev',            'bin',
-			'-clean',
-			'-port',           myTestPort,
-			'-testpluginname', shortName,
-			'-classnames',     classNames,
-			{:classpath =>     Dir.glob(File.join(pluginPath,'org.eclipse.equinox.launcher_*.jar'))} 
-			)
-    # Cleanup things
-    FileUtils.rm(testPortFileName, :verbose => false)
-    pdeJars.each{|x|  FileUtils.rm(x, :verbose => false)}
-    # TODO: mv all Text*.xml into a separate directory
-    # FileUtils.mv('TEST*.xml', 'reports', :verbose => false)
-  end
-end
-
-integration.teardown(:createPDEtestHtml)
-      
-layout = Layout.new
-layout[:source, :main, :java] = 'src'
-layout[:source, :main, :resources] = 'rsc'
-layout[:source, :test, :java] = 'test'
-
 desc "An example buildr project which runs a PDF unit test for an Eclipse PDE project"
-define('container') do
+define('myProject') do
   project.version = '1.0.0'
-  clean.enhance     do FileUtils.rm_rf(EclipsePath, :verbose => false) end
 
-  define 'PhoneBookExample', :version => "1.0.0", :layout => layout do
-    testPath = ['..', 'PhoneBookExample-test','test'].join(File::SEPARATOR)
-    if File.directory?(_(testPath))
-      puts "Patching Layout for PhoneBookExample-test"
-      layout[:source, :test, :java] = testPath
-      layout[:source, :test] = testPath
-      layout[:target, :test] = ['..', 'PhoneBookExample-test', 'target', 'test'].join(File::SEPARATOR)
-    else
-      puts "Nothing to patch for #{_(testPath)}"
+  define 'com.example.hellorcp' do
+  end
+
+  define 'PhoneBookExample'  do
+    PDE_test::run_pde_test(project, 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest') if defined?(PDE_test)
+  end
+  
+  if defined?(PDE_test) and false
+    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should exist' do
+      it.should exist
     end
-    compile { FileUtils.makedirs(_(['target','root','resources'].join(File::SEPARATOR))) }
-    compile.with dependencies + project.dependencies
-    package(:plugin).include _('plugin.xml')
-    package.include _('icons')
-    check package(:plugin), 'plugin should contain plugin.xml' do
-      it.should contain('plugin.xml')
-    end 
-    runPDE_UnitTest('phonebookexample.dialogs.PhoneBookEntryEditorDialogTest')
+    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain a manifest' do
+      it.should contain(['META-INF','MANIFEST.MF'].join(File::SEPARATOR))
+    end
+    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain the test class' do
+      it.should contain(File.join('phonebookexample','dialogs','PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class'))
+    end
+    check file('TEST-PhoneBookExample.xml'), 'should exist' do
+      it.should exist
+    end
+    check file('TEST-PhoneBookExample.xml'), 'should match success' do
+      File.read('TEST-PhoneBookExample.xml').should match '<testsuite errors="0" failures="0"'
+    end
+    check file(File.join('reports','PDE_test','index.html')), 'should exist' do
+      it.should exist
+    end
   end
-  
-  check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should exist' do
-    it.should exist
-  end
-  check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain a manifest' do
-    it.should contain(['META-INF','MANIFEST.MF'].join(File::SEPARATOR))
-  end
-  check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain the test class' do
-    it.should contain(File.join('phonebookexample','dialogs','PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class'))
-  end
-  check file('TEST-PhoneBookExample.xml'), 'should exist' do
-    it.should exist
-  end
-  check file('TEST-PhoneBookExample.xml'), 'should match success' do
-    File.read('TEST-PhoneBookExample.xml').should match '<testsuite errors="0" failures="0"'
-  end
-  check file(File.join('reports','PDE_test','index.html')), 'should exist' do
-    it.should exist
-  end
-  
 end

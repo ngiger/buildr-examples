@@ -44,6 +44,7 @@ def foFromTextile(dest, src)
   raise "File #{src} must exist " if !File.exists?(src)
   t = dest
   Java.load # needed to load class path for apache logger
+  if false
   Buildr.ant('wikitext_to_xslfo') do |wikitext|
       wikitext.taskdef :name=>'wikitext_to_xslfo',
       :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
@@ -54,6 +55,21 @@ def foFromTextile(dest, src)
 	      :validate => 'false',
 	      :markupLanguage => 'Textile' do
       wikitext.fileset(:dir => File.dirname(src), :includes => File.basename(src))
+    end
+  end
+  else
+    Java.load # needed to load class path for apache logger
+    Buildr.ant('wikitext_to_xslfo') do |wikitext|
+      wikitext.taskdef :name=>'wikitext_to_xslfo',
+       :classname=>'org.eclipse.mylyn.wikitext.core.util.anttask.MarkupToXslfoTask',
+       :classpath=> Dir.glob("#{ENV['OSGi']}/plugins/org.eclipse.mylyn.wikitext.*core*jar").join(File::PATH_SEPARATOR) do
+      end
+      FileUtils.makedirs(path_to(:target))
+       wikitext.wikitext_to_xslfo :targetdir=>path_to(:target),
+                 :validate => 'false',
+                 :markupLanguage => 'Textile' do
+         wikitext.fileset(:dir => _('.'), :includes => "**/*.textile")
+       end
     end
   end
 end
