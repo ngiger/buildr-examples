@@ -1,0 +1,78 @@
+<!-- Build file for the Phonebook Example application plugin -->
+<project name="phonebookexample" default="help" basedir=".">
+    <property name="plugin.dir"               location="${basedir}"/>
+    <property name="projects.dir"             location="${basedir}/.."/>
+    <property file="${projects.dir}/project.properties"/>
+
+    <property name="plugin.name"              value="PhoneBookExample"/>
+    <property name="plugin.version"           value="1.0.0"/>
+	<property name="target.eclipse.version"   value="indigo"/>
+    <property name="test.eclipse.dir"         location="${projects.dir}/eclipse-${target.eclipse.version}/eclipse"/>
+    <!--property name="test.eclipse.dir"         location="/opt/indigo/eclipse"/-->
+	<echo message="test.eclipse.dir is ${test.eclipse.dir}" />
+        <!--property name="test.eclipse.dir"         location="/opt/indigo/eclipse"/-->
+    <property name="test.eclipse.dir"         location="${projects.dir}/eclipse-${target.eclipse.version}/eclipse"/>
+    <property name="target.dir"               location="${projects.dir}/target"/>
+    <property name="published.plugins.dir"    location="${target.dir}/plugins"/>
+    <property name="src.dir"                  location="${plugin.dir}/src"/>
+    <property name="test.dir"                 location="${plugin.dir}/test"/>
+    <property name="plugin.target.dir"        location="${plugin.dir}/target"/>
+    <property name="reports.dir"              location="${plugin.target.dir}/reports"/>
+    <property name="classes.dir"              location="${plugin.target.dir}/classes"/>
+
+    <path id="build.class.path">
+        <fileset dir="${test.eclipse.dir}/plugins">
+            <include name="org.eclipse.ui_*.jar"/>
+            <include name="org.eclipse.ui.workbench_*.jar"/>
+            <include name="org.eclipse.core.runtime_*.jar"/>
+            <include name="org.eclipse.core.resources_*.jar"/>
+            <include name="org.eclipse.jface_*.jar"/>
+            <include name="org.eclipse.osgi_*.jar"/>
+            <include name="org.eclipse.swt_*.jar"/>
+            <include name="org.eclipse.swt.gtk.linux.x86_64*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="clean">
+        <delete dir="${plugin.dir}/bin"/>
+        <delete dir="${plugin.target.dir}"/>
+    </target>
+
+    <target name="build">
+        <mkdir dir="${classes.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" debug="${debug}" deprecation="${deprecation}" classpathref="build.class.path" includeantruntime="false"/>
+      <antcall target="create_eclipse_plugin"/>
+        <copy todir="${published.plugins.dir}" file="${plugin.target.dir}/${plugin.name}_${plugin.version}.jar" overwrite="true"/>
+    </target>
+
+    <target name="create_eclipse_plugin">
+        <property file="${plugin.dir}/build.properties"/>
+        <delete file="${plugin.target.dir}/${plugin.name}_${plugin.version}.jar"/>
+        <zip destfile="${plugin.target.dir}/${plugin.name}_${plugin.version}.jar">
+            <zipfileset dir="." includes="${bin.includes}"/>
+            <zipfileset dir="${classes.dir}"/>
+        </zip>
+    </target>
+
+    <target name="test">
+        <!-- no regular junit test -->
+    </target>
+
+    <target name="help">
+        <echo>
+This is the overall Ant build file for the Phonebook PDE Test example projects.
+
+Usage:
+
+Target                      Description
+==============              ==============================================
+[default]                   Displays this message.
+
+build                       Builds the source and creates the plugin jar.
+
+clean                       Cleans all the build and generated artefacts.
+        </echo>
+    </target>
+
+</project>
+

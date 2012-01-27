@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: PhoneBookExamplePlug-in
+Bundle-SymbolicName: PhoneBookExample; singleton:=true
+Bundle-Version: 1.0.0
+Bundle-Activator: phonebookexample.PhoneBookExamplePlugin
+Bundle-Localization: plugin
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime
+Bundle-ActivationPolicy: lazy
+Export-Package: phonebookexample,
+ phonebookexample.actions,
+ phonebookexample.data,
+ phonebookexample.dialogs
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
