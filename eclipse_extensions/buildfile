@@ -30,24 +30,22 @@ define('myProject') do
     PDE_test::run_pde_test(project, 'phonebookexample.dialogs.PhoneBookEntryEditorDialogTest') if defined?(PDE_test)
   end
   
-  if defined?(PDE_test) and false
-    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should exist' do
-      it.should exist
-    end
-    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain a manifest' do
-      it.should contain(['META-INF','MANIFEST.MF'].join(File::SEPARATOR))
-    end
-    check file(File.join('PhoneBookExample-test','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain the test class' do
-      it.should contain(File.join('phonebookexample','dialogs','PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class'))
-    end
-    check file('TEST-PhoneBookExample.xml'), 'should exist' do
-      it.should exist
-    end
-    check file('TEST-PhoneBookExample.xml'), 'should match success' do
-      File.read('TEST-PhoneBookExample.xml').should match '<testsuite errors="0" failures="0"'
-    end
-    check file(File.join('reports','PDE_test','index.html')), 'should exist' do
-      it.should exist
-    end
+  check file(File.join('PhoneBookExample','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should exist' do
+    it.should exist
+  end
+  check file(File.join('PhoneBookExample','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain a manifest' do
+    it.should contain(['META-INF','MANIFEST.MF'].join(File::SEPARATOR))
+  end
+  check file(File.join('PhoneBookExample','target','test','classes','PhoneBookExample-test_1.0.0.jar')), 'should contain the test class' do
+    it.should contain(File.join('phonebookexample','dialogs','PhoneBookEntryEditorDialogTest$MyPhoneBookEntryEditorDialog.class'))
+  end
+  check file('TEST-PhoneBookExample.xml'), 'should exist' do
+    it.should exist
+  end
+  check file('TEST-PhoneBookExample.xml'), 'should match success' do
+    File.read('TEST-PhoneBookExample.xml').should match '<testsuite errors="0" failures="0"'
+  end
+  check file(File.join('reports','PDE_test','index.html')), 'should exist' do
+    it.should exist
   end
 end

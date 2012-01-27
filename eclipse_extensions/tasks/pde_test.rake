@@ -5,7 +5,7 @@ module PDE_test
 
   first_time do
     # Define task not specific to any projet.
-    desc 'Run PDE-tests for the project (environment variable EclipseTarFile must be defined. Overrides OSGi)'
+    desc 'Run PDE-tests for the project. Envronment variabls OSGi must point to an empty Eclipse installation!'
     Project.local_task('pde_test')
   end
 
