@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+require 'buildrdeb'
+repositories.remote << "http://repo2.maven.org/maven2"
+binFile =  "hello-world/hello-world"
+Buildr::write binFile, "#/bin/sh -v\necho Hello World"
+FileUtils.chmod(0755, binFile)
+# FileUtils.chown('root', 'root', binFile)
+
+desc "A small example on howto create a Debian package using buildrdeb"
+define('DebianProject') do
+  project.version = '1.0.0'
+
+  define 'hello-world' do
+    package(:deb).enhance do |deb|
+      deb.control = _("config/control")
+      deb.postinst = _("config/postinst")
+      deb.include(_("hello-world"), :path => '/usr/bin')
+    end
+    check file(File.join('target', 'DebianProject-hello-world-1.0.0.deb')), 'should exist' do
+      it.should exist
+    end
+  end
+  
+end

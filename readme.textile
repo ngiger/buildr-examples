@@ -27,6 +27,12 @@ It contains various subdirectories, which contain each a small, self contained b
 * pde_unittest
 ** Running unit tests for Eclipse PDE project
 ** Not elegant, but show the way (I hope)
+* eclipse_extensions
+** Packages two examples of Eclipse RCP application
+** Runs PDE test for an RCP
+** Uses buildr Extension
+* debian
+** Simple Debian packet with a post-inst script
 
 I developed and tested the examples on my Debian wheezy (x86_64) system.
 Running the tests under windows showed several problems (e.g. wikitext_to_xslfo does

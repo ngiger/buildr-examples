@@ -1,0 +1,13 @@
+Source: hello-world
+Section: database
+Priority: optional
+Maintainer: Niklaus Giger <niklaus.giger@member.fsf.org>
+Build-Depends: dash
+Standards-Version: 3.9.1
+Package: hello-world
+Architecture: all
+Depends: dash
+Version: 1.0
+Homepage: http://www.helloworld.com
+Description: hello-world
+ A simple shell script with a Debian postinst script
