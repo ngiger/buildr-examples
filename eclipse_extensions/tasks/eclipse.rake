@@ -38,16 +38,16 @@ module EclipseExtension
   Layout.default[:source, :main, :scala]     = 'src'
   Layout.default[:source, :test, :java]      = 'test'
   Layout.default[:source, :test, :scala]     = 'test'
-#  Layout.default[:target, :main, :classes]   = 'target'
 
   before_define do |project|
     if project.parent
-
-      puts "OSGi ist #{ENV['OSGi']}"
+      if !ENV['OSGi'] 
+	  puts "OSGi musts point to an installed eclipse"
+	  exit(3)
+      end
       project.compile.with project.dependencies
       addDependencies(project) if project.dependencies
       project.package(:plugin) if  Dir.glob(File.join(project._,'plugin.xml')) 
-#      project.package(:jar)    if  Dir.glob(File.join(project._,'plugin.xml')) 
       project.compile { FileUtils.makedirs File.join(project.path_to(:target, 'root', 'resources'))
                          FileUtils.makedirs File.join(project._, 'target', 'resources_src', 'resources')
                       }

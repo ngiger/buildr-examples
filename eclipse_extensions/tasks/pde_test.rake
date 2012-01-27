@@ -39,14 +39,12 @@ module PDE_test
 	project.PDETestClassName = found[0].sub(tstPath,'').gsub(File::SEPARATOR,'.').sub('.src.','').sub(/^\./,'').sub(/\.java$/,'')
 	puts "#{project.id} has PDE_test #{project.PDETestClassName}"
       end
-      Rake::Task.define_task 'pde_test' do |task|
-      end
     end
   end
 
   after_define do |project|
     if project.PDETestClassName
-      project.compile.dependencies << EclipsePath
+      project.compile.dependencies << ENV['OSGi']
       project.test.exclude '*' # Tell junit to ignore all JUnit-test, as it would interfere with the PDE test
       project.test.compile.with project.dependencies + project.compile.dependencies
       project.test.with project.compile.target if project.compile.target
@@ -55,12 +53,6 @@ module PDE_test
 	PDE_test::run_pde_test(project, project.PDETestClassName)
       end
     end
-  end
-
-  # To use this method in your project:
-  #   pde_test classname (defaults to AllTests)
-  def loc(*paths)
-    task('pde_test'=>paths)
   end
 
 private 
@@ -72,38 +64,25 @@ private
     'org.eclipse.jdt:junit:jar:3.3.0-v20070606-0010'
   ]
 
-  myDefault = "/opt/downloads/eclipse-rcp-indigo-SR1-linux-gtk-x86_64.tar.gz"
-  EclipseTarFile = ENV['EclipseTarFile'] ?  ENV['EclipseTarFile'] : myDefault
-  EclipsePath = File.expand_path('eclipse')
-  ENV['OSGi'] = EclipsePath
-
   def PDE_test::stuffForRootProject
     @@pluginPath  = File.join(ENV['OSGi'], 'plugins') if ENV['OSGi']
-    puts "EclipsePath #{EclipsePath} #{File.exists?(EclipsePath)}"
-    puts "EclipseTarFile #{EclipseTarFile} #{File.exists?(EclipseTarFile)}"
-    if !File.exists?(EclipsePath)
-      puts "unpacking #{EclipseTarFile}"
-      Buildr::Unzip.new(Dir.pwd => EclipseTarFile).extract
+    @@pdeTestUtilsJar = File.join('target', 'pde.test.utils','pde.test.utils.jar')
+    puts "define pdtest jar #{@@pdeTestUtilsJar}"
+    pdeTestSources  = Dir.glob(File.join('pde.test.utils', '*.java'))
+    file @@pdeTestUtilsJar => pdeTestSources do
+      Buildr.ant('create_eclipse_plugin') do |x|
+	FileUtils.makedirs( File.dirname(@@pdeTestUtilsJar))
+	x.javac(:srcdir => File.join('pde.test.utils'),
+	      :classpath => getPdeTestClasspath.join(File::PATH_SEPARATOR),
+	      :includeantruntime => false,
+	      :destdir =>  File.dirname(@@pdeTestUtilsJar)
+	    )
+	x.echo(:message => "Create #{@@pdeTestUtilsJar}")
+	x.zip(:destfile => @@pdeTestUtilsJar,
+	      :basedir  => File.dirname(@@pdeTestUtilsJar),
+	      :includes => '**/*.class')
+      end
     end
-     
-  @@pdeTestUtilsJar = File.join('target', 'pde.test.utils','pde.test.utils.jar')
-  puts "define pdtest jar #{@@pdeTestUtilsJar}"
-  pdeTestSources  = Dir.glob(File.join('pde.test.utils', '*.java'))
-  file @@pdeTestUtilsJar => pdeTestSources do
-    Buildr.ant('create_eclipse_plugin') do |x|
-      FileUtils.makedirs( File.dirname(@@pdeTestUtilsJar))
-      x.javac(:srcdir => File.join('pde.test.utils'),
-	    :classpath => getPdeTestClasspath.join(File::PATH_SEPARATOR),
-	    :includeantruntime => false,
-	    :destdir =>  File.dirname(@@pdeTestUtilsJar)
-	  )
-      x.echo(:message => "Create #{@@pdeTestUtilsJar}")
-      x.zip(:destfile => @@pdeTestUtilsJar,
-	    :basedir  => File.dirname(@@pdeTestUtilsJar),
-	    :includes => '**/*.class')
-    end
-  end
-
   end
 
   # return all needed Eclipse plug-ins for the pdeTestLocator
@@ -245,4 +224,3 @@ class Buildr::Project
   include PDE_test
   attr_accessor :PDETestClassName,:PDETestResultXML
 end
-
